@@ -51,6 +51,32 @@ function onlyecc_properly(con::T,m;Nr=50, Nth=10) where {T<:Participant}
     return con.b,con.n_coll,mult,hypot(x0/mult,y0/mult),atan(y0,x0),num./denom ...
 end
 
+"""
+    trento_cmd_line(nucleus1::String, nucleus2::String, w::Float64, k::Float64, p::Float64, sqrtS::Float64, nEvents::Int64, [mList]::Vec[Float64],[b]::Float64)::Vec[Float64]
+    
+Run TrenTo and return integrated quantities, not the profiles. The output is impact parameter, Ncoll, Center of mass radius, Center of mass angle, eccentricities corresponding to mList input
+
+### Input
+
+    - `nucleus1::String` -- String representing the nucleus 1. For example, "Pb"
+    - `nucleus2::String` -- String representing the nucleus 2. For example, "Pb"
+    - `w::Float64` -- Float64 nucleon width
+    - `k::Float64` -- Float64 amount of fluctuations
+    - `p::Float64` -- Float64 power of the generalized mean
+    - `sqrtS::Float64` -- Float64 center of mass energy, in GeV, the sigma_NN value is obtained via a fit obtained from 2306.08665
+    - `nEvents::Int64` -- Int64 number of events to generate
+    - `mList::Vec[Float64]` -- Vector of Float64 values of the eccentricities to calculate
+    - `b::Float64` -- Float64 impact parameter. For a number all events are generated with the same impact parameter
+    - `b::Tuple{Float64,Float64}` -- Tuple of Float64 values of the impact parameter range. 
+
+### Output
+
+The output is a vector containing impact parameter, Ncoll, Center of mass radius, Center of mass angle, eccentricities corresponding to mList input
+
+### Notes
+
+nothjiong
+"""
 function trento_cmd_line(Projectile1,Projectile2,w,k,p,sqrtS,nevents;mList=[2,3,4,5],b=-1)
     sigma_NN=cross_section_from_energy(sqrtS)
     #if b<-1
