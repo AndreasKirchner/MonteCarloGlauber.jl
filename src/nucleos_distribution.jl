@@ -280,6 +280,8 @@ function sample_nevent_with_rotation_threaded(rng,s::IntegratedWoodSaxonInterp{T
         return  n1_
 end
 
+#here i comment since it gives erro 
+#=
 function sample_nenvet_with_rotation(rng,s::NucleiWoodSaxon3D{T,R,C,W,D1,D2,D3,D4,F,B},nevent) where {T,R,C,W,D1,D2,D3,D4,F,B}
 
     totsize1=nevent*s.N_nucleon
@@ -296,8 +298,9 @@ function sample_nenvet_with_rotation(rng,s::NucleiWoodSaxon3D{T,R,C,W,D1,D2,D3,D
     
     end
     return  n1_
-end 
-    
+end
+=#
+
 function sample_nevent_with_rotation_threaded(rng,s::NucleiWoodSaxon3D{T,R,C,W,D1,D2,D3,D4,F,B},nevent) where {T,R,C,W,D1,D2,D3,D4,F,B}
     
         totsize=nevent*s.N_nucleon

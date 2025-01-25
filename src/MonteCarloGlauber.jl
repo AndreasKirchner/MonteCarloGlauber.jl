@@ -14,9 +14,10 @@ using DifferentiationInterface
 using QuadGK
 using Interpolations
 
-include("FluiduM_running.jl")
+
 include("participants_distribution.jl")
 include("nucleos_distribution.jl")
+include("FluiduM_running.jl")
 
 #This file has all the functions to run the event by event initial conditions and to generate the fluidum intiail conditions
 
