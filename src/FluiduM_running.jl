@@ -1,26 +1,6 @@
-#This file has all the functions to run the event by event initial conditions and to generate the fluidum intiail conditions
-using Distributions
-using Random
-#using QuadGK
-#using Interpolations
-using SpecialFunctions
-using SimpleNonlinearSolve
-using StatsBase
-using StaticArrays
-using LinearAlgebra
-using Plots
-#using BenchmarkTools
-using OhMyThreads
-using Rotations
-#using Profile
-#using PProf
-using JLD2
-using DifferentiationInterface
-using IterTools
-using LaTeXStrings
 
-include("nucleos_distribution.jl")
-include("participants_distribution.jl")
+
+
 
 function onlyecc_properly(con::T,m;Nr=50, Nth=10) where {T<:Participant}
     R1=con.R1
@@ -344,7 +324,7 @@ end
 
 
 ####minimal working example
-
+#=
 #define EoS and its inverse
 energy(T)=T^4
 Te4=InverseFunction(energy)
@@ -356,3 +336,4 @@ plot(bg[1])
 #plot the two point function
 heatmap(real.(twpt[1][1]))
 heatmap(imag.(twpt[1][1]))
+=#

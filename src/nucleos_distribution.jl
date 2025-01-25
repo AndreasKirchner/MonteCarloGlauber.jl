@@ -1,8 +1,4 @@
-using Distributions
-using Random
-using QuadGK
-using Interpolations
-using HDF5
+
 
 
 function density_WS(x,y,z,α,R,ρ₀,w)
@@ -108,6 +104,8 @@ is_indipendnet(::IntegratedWoodSaxon{T,R,C,W,F,B,Seg}) where {T,R,C,W,F,B,Seg} =
 
 uniform_point(rng::AbstractRNG,s::IntegratedWoodSaxon{T1,R,C,W,F,B,Seg}) where {T1,R,C,W,F,B,Seg}= (rand(rng)*2*s.range-s.range ,rand(rng)*2*s.range-s.range )
 
+## I comment this but i am not sure if it is needed
+#=
 function sample_nenvet_with_rotation(rng,s::IntegratedWoodSaxon{T1,R,C,W,F,B,Seg},nevent) where {T1,R,C,W,F,B,Seg}
 
     totsize1=nevent*s.N_nucleon
@@ -125,6 +123,7 @@ function sample_nenvet_with_rotation(rng,s::IntegratedWoodSaxon{T1,R,C,W,F,B,Seg
     end
     return  n1_
 end 
+=#
     
 function sample_nevent_with_rotation_threaded(rng,s::IntegratedWoodSaxon{T1,R,C,W,F,B,Seg},nevent) where {T1,R,C,W,F,B,Seg}
     
