@@ -1,8 +1,8 @@
 #This file has all the functions to run the event by event initial conditions and to generate the fluidum intiail conditions
 using Distributions
 using Random
-using QuadGK
-using Interpolations
+#using QuadGK
+#using Interpolations
 using SpecialFunctions
 using SimpleNonlinearSolve
 using StatsBase
@@ -18,7 +18,6 @@ using JLD2
 using DifferentiationInterface
 using IterTools
 using LaTeXStrings
-using HDF5
 
 include("nucleos_distribution.jl")
 include("participants_distribution.jl")
@@ -327,7 +326,7 @@ end
 
 
 ####minimal working example
-
+#=
 #define EoS and its inverse
 #energy(T)=T^4
 #Te4=InverseFunction(energy)
@@ -337,5 +336,6 @@ end
 #plot the background
 #plot(bg[1])
 #plot the two point function
-#heatmap(real.(twpt[1][1]))
-#heatmap(imag.(twpt[1][1]))
+heatmap(real.(twpt[1][1]))
+heatmap(imag.(twpt[1][1]))
+=#
