@@ -302,20 +302,22 @@ function Distributions._rand!(rng::AbstractRNG, nucleos::Participants{NUCL1, NUC
     nevent=length(A)#nucleos.n_event
     
     
-
     n1=sample_nevent_with_rotation_threaded(rng,nucleos.nucl1,nevent)
     n2=sample_nevent_with_rotation_threaded(rng,nucleos.nucl2,nevent)
 
-
-    map!(A,eachindex(A)) do event 
+    event=1
+    #map!(A,eachindex(A)) do event 
+     #   @show event
+    while event<=nevent
     #for (event1,event2) in zip(axes(n1,1),axes(n2,1))
+    ncoll=0
     b=sampleb(rng,nucleos.inpact_parameter)
         event1=event 
         event2=event
         re1=fill(SVector{2,eltype(n1)}(zero(eltype(n1)),zero(eltype(n1))),0)
         re2=fill(SVector{2,eltype(n2)}(zero(eltype(n2)),zero(eltype(n2))),0)
 
-        ncoll=1
+        #ncoll=1
         rot1=rand(rng,RotMatrix2)
         rot2=rand(rng,RotMatrix2)
          @inbounds for nucl1 in axes(n1,2)
@@ -347,24 +349,26 @@ function Distributions._rand!(rng::AbstractRNG, nucleos::Participants{NUCL1, NUC
                     push!(re2,SVector{2}(x_2,y_2))
              
                     ncoll+=1
-                end 
-         
-                
+                end  
             end 
         end 
-        
-        #result1[event1]=unique(re1)
-        #result2[event2]=unique(re2) 
-        #binary_collision[event1]=ncoll
-        r1=re1#unique(re1)#this might be wrong
-        r2=re2#unique(re2)
+        #r1=re1#unique(re1)#this might be wrong
+        #r2=re2#unique(re2)
+        r1=unique(re1)
+        r2=unique(re2)
         k=nucleos.shape_parameter
         shape_1=rand(rng,Gamma(k,1/k),length(r1))
         shape_2=rand(rng,Gamma(k,1/k),length(r2))
         #A[event1]=Participant(r1,r2,shape_1,shape_2,ncoll,nucleos.sub_nucleon_width,nucleos.shape_parameter,nucleos.p)
-        Participant(r1,r2,shape_1,shape_2,ncoll,nucleos.sub_nucleon_width,nucleos.shape_parameter,nucleos.p,R1,R2,b)
+        #Participant(r1,r2,shape_1,shape_2,ncoll,nucleos.sub_nucleon_width,nucleos.shape_parameter,nucleos.p,R1,R2,b)
+    if ncoll>0
+        A[event]=Participant(r1,r2,shape_1,shape_2,ncoll,nucleos.sub_nucleon_width,nucleos.shape_parameter,nucleos.p,R1,R2,b)
+        event+=1
+    end
+    #Participant(r1,r2,shape_1,shape_2,ncoll,nucleos.sub_nucleon_width,nucleos.shape_parameter,nucleos.p,R1,R2,b)
     end
     return A
+
 end
 
 function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2, C, D, E, F, L}) where {NUCL1, NUCL2, C, D, E, F, L}
@@ -375,6 +379,8 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
     totsize1=nucleos.nucl1.N_nucleon
     totsize2=nucleos.nucl2.N_nucleon
 
+   ncoll=0
+   while ncoll==0
     b=sampleb(rng,nucleos.inpact_parameter)
     #n1=transpose(rand(rng,nucleos.nucl1,totsize1))
     #n2=transpose(rand(rng,nucleos.nucl2,totsize2))
@@ -426,7 +432,7 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
         #re1=Vector{SVector{2,eltype(n1)}}[]
         #re2=Vector{SVector{2,eltype(n2)}}[]
 
-        ncoll=1
+        #ncoll=1
         rot1=rand(rng,RotMatrix2)
         rot2=rand(rng,RotMatrix2)
          @inbounds for nucl1 in axes(n1,1)
@@ -474,13 +480,13 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
         #result1[event1]=uniquùe(re1)
         #result2[event2]=unique(re2) 
         #binary_collision[event1]=ncoll
-        #r1=unique(re1)
-        #r2=unique(re2)
-        r1=re1
-        r2=re2
+        r1=unique(re1)
+        r2=unique(re2)
+        #r1=re1
+        #r2=re2
         k=nucleos.shape_parameter
         shape_1=rand(rng,Gamma(k,1/k),length(r1))
         shape_2=rand(rng,Gamma(k,1/k),length(r2))
         return Participant(r1,r2,shape_1,shape_2,ncoll,nucleos.sub_nucleon_width,nucleos.shape_parameter,nucleos.p,R1,R2,b)
-    
+    end
 end

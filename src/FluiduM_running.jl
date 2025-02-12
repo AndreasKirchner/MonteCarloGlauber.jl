@@ -1,8 +1,8 @@
 #This file has all the functions to run the event by event initial conditions and to generate the fluidum intiail conditions
 using Distributions
 using Random
-#using QuadGK
-#using Interpolations
+using QuadGK
+using Interpolations
 using SpecialFunctions
 using SimpleNonlinearSolve
 using StatsBase
@@ -18,6 +18,7 @@ using JLD2
 using DifferentiationInterface
 using IterTools
 using LaTeXStrings
+using HDF5
 
 include("nucleos_distribution.jl")
 include("participants_distribution.jl")
@@ -51,39 +52,13 @@ function onlyecc_properly(con::T,m;Nr=50, Nth=10) where {T<:Participant}
     return con.b,con.n_coll,mult,hypot(x0/mult,y0/mult),atan(y0,x0),num./denom ...
 end
 
-"""
-    trento_cmd_line(nucleus1::String, nucleus2::String, w::Float64, k::Float64, p::Float64, sqrtS::Float64, nEvents::Int64, [mList]::Vec[Float64],[b]::Float64)::Vec[Float64]
-    
-Run TrenTo and return integrated quantities, not the profiles. The output is impact parameter, Ncoll, Center of mass radius, Center of mass angle, eccentricities corresponding to mList input
-
-### Input
-
-    - `nucleus1::String` -- String representing the nucleus 1. For example, "Pb"
-    - `nucleus2::String` -- String representing the nucleus 2. For example, "Pb"
-    - `w::Float64` -- Float64 nucleon width
-    - `k::Float64` -- Float64 amount of fluctuations
-    - `p::Float64` -- Float64 power of the generalized mean
-    - `sqrtS::Float64` -- Float64 center of mass energy, in GeV, the sigma_NN value is obtained via a fit obtained from 2306.08665
-    - `nEvents::Int64` -- Int64 number of events to generate
-    - `mList::Vec[Float64]` -- Vector of Float64 values of the eccentricities to calculate
-    - `b::Float64` -- Float64 impact parameter. For a number all events are generated with the same impact parameter
-    - `b::Tuple{Float64,Float64}` -- Tuple of Float64 values of the impact parameter range. 
-
-### Output
-
-The output is a vector containing impact parameter, Ncoll, Center of mass radius, Center of mass angle, eccentricities corresponding to mList input
-
-### Notes
-
-nothjiong
-"""
 function trento_cmd_line(Projectile1,Projectile2,w,k,p,sqrtS,nevents;mList=[2,3,4,5],b=-1)
     sigma_NN=cross_section_from_energy(sqrtS)
-    #if b<-1
+    if b==-1
         participants=Participants(Projectile1,Projectile2,w,sigma_NN,k,p)
-   # else
-    #    participants=Participants(Projectile1,Projectile2,w,b,sigma_NN,k,p)
-    #end
+    else
+        participants=Participants(Projectile1,Projectile2,w,b,sigma_NN,k,p)
+    end
     events=rand(participants,nevents)
     return stack(map(i->onlyecc_properly(events[i],mList),1:nevents))
 #output multiplicity, center of mass, reaction plane angle, eccentricities, npart, ncoll, b
@@ -201,11 +176,13 @@ end
 
 function generatingfunction(conf_part::Vector{T},h,r,step,CoMList) where {T<:Participant}
     #sumval=0.0
+    δr=last(r)/length(r)
+    δθ=step
     mean(enumerate(conf_part)) do (i,conf)#for i in 1:length(conf_part)#mean(conf_part) do conf
         exp(1/(2pi)* sum(0:step:2pi) do θ
         sum(eachindex(r)) do iᵣ
             # exp(im\theta) h(r,theta) = h cos + ih sin = (re h+i im h)cos + (i re- im h )sin  
-            -conf(r[iᵣ]*cos(θ)-CoMList[i][2]/CoMList[i][1],r[iᵣ]*sin(θ)-CoMList[i][3]/CoMList[i][1])*h[iᵣ]#(h[iᵣ,1]*cos(θ*m)+h[iᵣ,2]*sin(θ*m))
+            -conf(r[iᵣ]*cos(θ)-CoMList[i][2]/CoMList[i][1],r[iᵣ]*sin(θ)-CoMList[i][3]/CoMList[i][1])*h[iᵣ]*δθ#(h[iᵣ,1]*cos(θ*m)+h[iᵣ,2]*sin(θ*m))
         end
         end)
     end 
@@ -214,11 +191,13 @@ end
 
 function generatingfunction(conf_part::Vector{T},h,r,step,CoMList,f,norm) where {T<:Participant}
     #sumval=0.0
+    δr=last(r)/length(r)
+    δθ=step
     mean(enumerate(conf_part)) do (i,conf)#for i in 1:length(conf_part)#mean(conf_part) do conf
         exp(1/(2pi)* sum(0:step:2pi) do θ
         sum(eachindex(r)) do iᵣ
             # exp(im\theta) h(r,theta) = h cos + ih sin = (re h+i im h)cos + (i re- im h )sin  
-            -f(norm*conf(r[iᵣ]*cos(θ)-CoMList[i][2]/CoMList[i][1],r[iᵣ]*sin(θ)-CoMList[i][3]/CoMList[i][1]))*h[iᵣ]#(h[iᵣ,1]*cos(θ*m)+h[iᵣ,2]*sin(θ*m))
+            -f(norm*conf(r[iᵣ]*cos(θ)-CoMList[i][2]/CoMList[i][1],r[iᵣ]*sin(θ)-CoMList[i][3]/CoMList[i][1]))*h[iᵣ]*δθ#(h[iᵣ,1]*cos(θ*m)+h[iᵣ,2]*sin(θ*m))
         end
         end)
     end 
@@ -227,11 +206,13 @@ end
 
 function generatingfunction_h(conf_part::Vector{T},h,r,step,CoMList,m) where {T<:Participant}
     #sumval=0.0
+    δr=last(r)/length(r)
+    δθ=step
     mean(enumerate(conf_part)) do (i,conf)#for i in 1:length(conf_part)#mean(conf_part) do conf
         exp(1/(2pi)* sum(0:step:2pi) do θ
         sum(eachindex(r)) do iᵣ
             # exp(im\theta) h(r,theta) = h cos + ih sin = (re h+i im h)cos + (i re- im h )sin  
-            -conf(r[iᵣ]*cos(θ)-CoMList[i][2]/CoMList[i][1],r[iᵣ]*sin(θ)-CoMList[i][3]/CoMList[i][1])*(h[iᵣ,1]*cos(θ*m)+h[iᵣ,2]*sin(θ*m))
+            -conf(r[iᵣ]*cos(θ)-CoMList[i][2]/CoMList[i][1],r[iᵣ]*sin(θ)-CoMList[i][3]/CoMList[i][1])*(h[iᵣ,1]*cos(θ*m)+h[iᵣ,2]*sin(θ*m))*δθ
         end
         end)
     end 
@@ -240,11 +221,13 @@ end
 
 function generatingfunction_h(conf_part::Vector{T},h,r,step,CoMList,m,f,norm) where {T<:Participant}
     #sumval=0.0
+    δr=last(r)/length(r)
+    δθ=step
     mean(enumerate(conf_part)) do (i,conf)#for i in 1:length(conf_part)#mean(conf_part) do conf
         exp(1/(2pi)* sum(0:step:2pi) do θ
         sum(eachindex(r)) do iᵣ
             # exp(im\theta) h(r,theta) = h cos + ih sin = (re h+i im h)cos + (i re- im h )sin  
-            -f(norm*conf(r[iᵣ]*cos(θ)-CoMList[i][2]/CoMList[i][1],r[iᵣ]*sin(θ)-CoMList[i][3]/CoMList[i][1]))*(h[iᵣ,1]*cos(θ*m)+h[iᵣ,2]*sin(θ*m))
+            -f(norm*conf(r[iᵣ]*cos(θ)-CoMList[i][2]/CoMList[i][1],r[iᵣ]*sin(θ)-CoMList[i][3]/CoMList[i][1]))*(h[iᵣ,1]*cos(θ*m)+h[iᵣ,2]*sin(θ*m))*δθ
         end
         end)
     end 
@@ -346,13 +329,13 @@ end
 ####minimal working example
 
 #define EoS and its inverse
-energy(T)=T^4
-Te4=InverseFunction(energy)
+#energy(T)=T^4
+#Te4=InverseFunction(energy)
 # get the background and two point function
-bg,twpt=generate_bg_two_pt_fct(Te4,100,Lead(),Lead(),1.2,3.0,0.5,2760,[10,20],[2,3,4];minBiasEvents=500,r_grid=0:1:20)
+#bg,twpt=generate_bg_two_pt_fct(Te4,100,Lead(),Lead(),1.2,3.0,0.5,2760,[10,20],[2,3,4];minBiasEvents=500,r_grid=0:1:20)
 
 #plot the background
-plot(bg[1])
+#plot(bg[1])
 #plot the two point function
-heatmap(real.(twpt[1][1]))
-heatmap(imag.(twpt[1][1]))
+#heatmap(real.(twpt[1][1]))
+#heatmap(imag.(twpt[1][1]))
