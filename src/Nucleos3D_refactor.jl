@@ -64,6 +64,11 @@ function NucleiWoodSaxon3D(N_nucleon,α,R,ρ₀,w,beta2,beta3,beta4,gamma,dmin)
     NucleiWoodSaxon3D(rng,N_nucleon,α,R,ρ₀,w,beta2,beta3,beta4,gamma,burning_time,dmin)
 end 
 
+"""
+    NucleiWoodSaxon3D(N_nucleon,α,R,ρ₀,w,beta2,beta3,beta4,gamma)
+
+Create a 3D distribution of nucleons in a nucleus with a Wood-Saxon density profile. The density profile is deformed by the parameters `beta2`, `beta3`, `beta4`, and `gamma`. The number of nucleons is `N_nucleon`, the radius is `R`, the diffuseness is `α`, the central density is `ρ₀`, and the skin depth is `w`.
+"""
 function NucleiWoodSaxon3D(N_nucleon,α,R,ρ₀,w,beta2,beta3,beta4,gamma)
     rng=Random.default_rng()
     burning_time=1000

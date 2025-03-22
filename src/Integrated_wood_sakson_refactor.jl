@@ -35,6 +35,14 @@ end
 
 
 
+"""
+    IntegratedWoodSaxon(N_nucleon::Int,α,R,ρ₀,w,rotated=true,retol=1e-3
+    ,rng=Random.default_rng()
+    ,burning_time=1000)
+
+Create a sampleable object that represents a Wood Saxon distribution with a given number of nucleons.
+The distribution is deformed by the parameters `α`, `R`, `ρ₀`, and `w`. The number of nucleons is `N_nucleon`.
+"""
 function IntegratedWoodSaxon(N_nucleon::Int,α,R,ρ₀,w,rotated=true,retol=1e-3
     ,rng=Random.default_rng()
     ,burning_time=1000)

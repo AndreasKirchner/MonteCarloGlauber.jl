@@ -43,6 +43,12 @@ function IntegratedWoodSaxonInterp(N_nucleon,α,R,ρ₀,w,burning_time,retol,Npo
 
 end
 
+"""
+    IntegratedWoodSaxonInterp(N_nucleon,α,R,ρ₀,w,rng=Random.default_rng(),rotated=true)
+
+Create a sampleable object that represents a Wood Saxon distribution with a given number of nucleons.
+The distribution is deformed by the parameters `α`, `R`, `ρ₀`, and `w`. The number of nucleons is `N_nucleon`.
+"""
 function IntegratedWoodSaxonInterp(N_nucleon,α,R,ρ₀,w,rng=Random.default_rng(),rotated=true)
     burning_time=1000
     retol=1e-3
