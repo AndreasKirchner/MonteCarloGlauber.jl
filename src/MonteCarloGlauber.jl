@@ -22,11 +22,13 @@ include("Integrated_wood_sakson_refactor.jl")
 include("Integrated_wood_sakson_interp_refactor.jl")
 include("Nucleos3D_refactor.jl")
 include("participants_distribution_refactor.jl")
+include("Nucleos_definition.jl")
 
 
 
 export NucleiWoodSaxon3D,IntegratedWoodSaxonInterp,IntegratedWoodSaxon, Participants, Participant, threarded, Threarded, rand 
 
+export Uranium, Lead, Gold, Copper, Xenon
 
 
 
