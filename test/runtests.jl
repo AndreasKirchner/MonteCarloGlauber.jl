@@ -38,4 +38,5 @@ using Test
     @test rand(rng,ee) isa Array{Float64,2}
     @test rand(rng,ff) isa Array{Float64,2}        
 
+    Parti
 end
