@@ -1,24 +1,69 @@
-using QuadGK
-using Distributions
-using Random
-using Base.Threads: nthreads
-using OhMyThreads: @spawn, fetch
-using OhMyThreads
-using Rotations
-using LinearAlgebra
-using Interpolations
-using StaticArrays
-using Plots
-using NonlinearSolve
-using SpecialFunctions
 
-include("Metropolis_Hastings.jl")
-include("Integrated_wood_sakson_refactor.jl")
-include("Integrated_wood_sakson_interp_refactor.jl")
-include("Nucleos3D_refactor.jl")
-include("participants_distribution_refactor.jl")
-
+using Statistics
 using MonteCarloGlauber
+using Plots
+
+
+
+n1= Lead()
+n2= Uranium()
+
+rand(n1)
+
+rand(n2)
+
+rand(threarded(n1),100)
+
+w= 1
+s_NN=5000
+k=1
+p=0.
+b=(1,2)
+
+participants=Participants(n1,n2,2,s_NN,k,p,b)
+
+event=rand(participants,1000)
+
+b_event=map(event) do x
+    impactParameter(x) 
+end 
+
+ncoll_event=map(event) do x
+    x.n_coll
+end
+
+profile=map(event)   do x 
+    map(Iterators.product(-10:10,-10:10)) do y
+        x(y...)
+    end
+end 
+
+heatmap(mean(profile))
+
+
+Plots.histogram(b_event,nbins=100)
+Plots.histogram(ncoll_event,nbins=100)
+
+
+participants=Participants(n1,n2,w,s_NN,k,p)
+
+event=rand(participants,1000)
+
+b_event=map(event) do x
+    impactParameter(x) 
+end 
+
+ncoll_event=map(event) do x
+    x.n_coll
+end 
+
+using Plots
+Plots.histogram(b_event,nbins=100)
+Plots.histogram(ncoll_event,nbins=100)
+
+
+
+
 
 
 using Profile
