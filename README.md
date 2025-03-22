@@ -5,7 +5,7 @@
 To install the package and its dependencies one can use 
 ```julia
 import Pkg
-Pkg.add(url = "https://github.com/fafafrens/Fluidum.jl](https://github.com/AndreasKirchner/MonteCarloGlauber.jl")
+Pkg.add(url = "https://github.com/AndreasKirchner/MonteCarloGlauber.jl")
 ```
 After this one can use the package simply by using 
 ```julia
