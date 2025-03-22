@@ -93,31 +93,31 @@ function Distributions._rand!(rng::AbstractRNG, s::IntegratedWoodSaxon{T,R,C,W,s
 end
 
 
-struct Threarded{T,N} <: Sampleable{ArrayLikeVariate{N},Continuous}
+struct Threaded{T,N} <: Sampleable{ArrayLikeVariate{N},Continuous}
     copy_buff::T
     dim::Int64  
 end
 
-Base.size(s::Threarded) = (s.nucleon,s.dim)
-Base.eltype(s::Threarded{T,N}) where {T,N} = eltype(first(s.copy_buff))
+Base.size(s::Threaded{T,N}) where {T,N} = (s.nucleon,s.dim)
+Base.eltype(s::Threaded{T,N}) where {T,N} = eltype(first(s.copy_buff))
 
 
-function Threarded(elem::T,nbuffers) where {T}
+function Threaded(elem::T,nbuffers) where {T}
     copy_buff=map(i->copy(elem),1:nbuffers)
-    Threarded{typeof(copy_buff),dimension(elem)}(copy_buff,dimension(elem))
+    Threaded{typeof(copy_buff),dimension(elem)}(copy_buff,dimension(elem))
 end 
-function Threarded(elem)
-    Threarded(elem,2*nthreads())
+function Threaded(elem)
+    Threaded(elem,2*nthreads())
 end 
 
 """
-    threarded(elm)
+    threaded(elm)
 
 Create a sampleable object that will mutithread the call of rand.
 """
-threarded(elm)=Threarded(elm)
+threaded(elm)=Threaded(elm)
 
-function Distributions.rand(rng::AbstractRNG,s::Threarded{T,N},n::Int64) where {T,N}
+function Distributions.rand(rng::AbstractRNG,s::Threaded{T,N},n::Int64) where {T,N}
     ntask=length(s.copy_buff)
     chuncks=div(n,ntask)
     reminder=n-ntask*chuncks
@@ -133,9 +133,9 @@ function Distributions.rand(rng::AbstractRNG,s::Threarded{T,N},n::Int64) where {
     return result
 end 
 
-Distributions.rand(s::Threarded{T,N},n::Int64) where {T,N}= Distributions.rand(Random.default_rng(),s,n)
+Distributions.rand(s::Threaded{T,N},n::Int64) where {T,N}= Distributions.rand(Random.default_rng(),s,n)
 
-Distributions.rand(s::Threarded{T,N}) where {T,N} = Distributions.rand(Random.default_rng(),s,1)
+Distributions.rand(s::Threaded{T,N}) where {T,N} = Distributions.rand(Random.default_rng(),s,1)
 
 
 

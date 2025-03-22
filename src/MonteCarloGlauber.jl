@@ -26,7 +26,7 @@ include("Nucleos_definition.jl")
 
 
 
-export NucleiWoodSaxon3D,IntegratedWoodSaxonInterp,IntegratedWoodSaxon, Participants, Participant, threarded, Threarded, rand 
+export NucleiWoodSaxon3D,IntegratedWoodSaxonInterp,IntegratedWoodSaxon, Participants, Participant, threaded, Threaded, rand 
 export impactParameter 
 
 export Uranium, Lead, Gold, Copper, Xenon

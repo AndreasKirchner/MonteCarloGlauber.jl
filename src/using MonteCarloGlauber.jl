@@ -2,7 +2,7 @@
 using Statistics
 using MonteCarloGlauber
 using Plots
-
+ 
 
 
 n1= Lead()
@@ -61,7 +61,21 @@ using Plots
 Plots.histogram(b_event,nbins=100)
 Plots.histogram(ncoll_event,nbins=100)
 
+participants=(Participants(n1,n2,w,s_NN,k,p))
 
+event=rand(participants,1000)
+
+b_event=map(event) do x
+    impactParameter(x) 
+end 
+
+ncoll_event=map(event) do x
+    x.n_coll
+end 
+
+using Plots
+Plots.histogram(b_event,nbins=100)
+Plots.histogram(ncoll_event,nbins=100)
 
 
 
