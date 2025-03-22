@@ -63,7 +63,7 @@ function trento_cmd_line(Projectile1,Projectile2,w,k,p,sqrtS,nevents;mList=[2,3,
 #output multiplicity, center of mass, reaction plane angle, eccentricities, npart, ncoll, b
 end
 
-
+cross_section_from_energy(5000)
 
 function cross_section_from_energy(sqrtS) #returns the cross section for sqrtS in GeV
     return (0.073491826*log(sqrtS)-.19313457)*log(sqrtS)+3.123737545
