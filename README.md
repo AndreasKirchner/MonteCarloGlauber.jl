@@ -32,10 +32,10 @@ To sample more call
 rand(n1,100)
 ```
 now you will have 100 events in a vector. 
-The rand mutates the state of the nucleus, so it is generically not threadsafe. However exists 
+The rand mutates the state of the nucleus, so it is generically not threadsafe. However, there exists 
 a function that makes a copy in each thread and safely evaluates the rand on each thread. 
 ```julia
-rand(threarded(n1),100)
+rand(threaded(n1),100)
 ```
 The Monte Carlo Glauber model is specified by the parameter
 ```julia
