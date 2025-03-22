@@ -110,6 +110,11 @@ function Threarded(elem)
     Threarded(elem,2*nthreads())
 end 
 
+"""
+    threarded(elm)
+
+Create a sampleable object that will mutithread the call of rand.
+"""
 threarded(elm)=Threarded(elm)
 
 function Distributions.rand(rng::AbstractRNG,s::Threarded{T,N},n::Int64) where {T,N}

@@ -38,7 +38,7 @@ PProf.Allocs.pprof(prof; from_c=false)
 aa=NucleiWoodSaxon3D(10, 1.5, 5., 1., 0., 0., 0., 0., 0.)
 aa=IntegratedWoodSaxon(10,1,5.,1.,0.)
 aa=IntegratedWoodSaxonInterp(10,1,5.,1.,0.)
-bb=Threarded(aa,2*Threads.nthreads())
+bb=threarded(aa)
 cc=Threarded(aa,Threads.nthreads())
 dd=Threarded(aa,10*Threads.nthreads())
 
