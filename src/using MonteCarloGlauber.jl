@@ -12,7 +12,7 @@ rand(n1)
 
 rand(n2)
 
-rand(threarded(n1),100)
+rand(threaded(n1),100)
 
 w= 1
 s_NN=5000

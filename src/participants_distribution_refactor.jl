@@ -114,6 +114,10 @@ Constructor for the Participants distribution. It takes the following arguments:
     p: Norm parameter
     b: Impact parameter distribution (optional) 
 """
+function Participants
+
+end 
+
 function Participants(n1,n2,w,s_NN,k,p,b)
 
     sigma_NN=cross_section_from_energy(s_NN)
@@ -134,18 +138,7 @@ end
 
 dimension(s::Participants{A,B,C,D,E,F,G,L}) where {A,B,C,D,E,F,G,L}  = 1
 
-"""
-    Participants(n1,n2,w,s_NN,k,p[,b])
 
-Constructor for the Participants distribution. It takes the following arguments:
-    n1: Nucleus 1
-    n2: Nucleus 2
-    w: Subnucleon width
-    s_NN: Energy in GeV
-    k: Shape parameter
-    p: Norm parameter
-    b: Impact parameter distribution (optional) 
-"""
 function Participants(n1,n2,w,s_NN,k,p)
     
     R1=n1.R    
