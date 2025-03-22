@@ -41,8 +41,8 @@ using Test
     event=Participants(aa,aa,1,1,6.4,1,0)
 
     
-    @test eltype(event) == Float64
-    @test rand(rng,event,100) isa Array{Float64,2}
+    
+    @test rand(rng,event,100) isa Vector{Array{Float64,2}}
     @test rand(rng,event) isa Array{Float64,2}
 
 end
