@@ -102,7 +102,19 @@ struct Participants{A,B,C,D,E,F,G,L} <:Sampleable{Univariate,Participant}
     p::L
 end 
 
-function Participants(n1,n2,w,b,s_NN,k,p)
+"""
+    Participants(n1,n2,w,s_NN,k,p[,b])
+
+Constructor for the Participants distribution. It takes the following arguments:
+    n1: Nucleus 1
+    n2: Nucleus 2
+    w: Subnucleon width
+    s_NN: Energy in GeV
+    k: Shape parameter
+    p: Norm parameter
+    b: Impact parameter distribution (optional) 
+"""
+function Participants(n1,n2,w,s_NN,k,p,b)
 
     sigma_NN=cross_section_from_energy(s_NN)
     f(sigmagg,p)=totalcross_section(w,sigmagg,sigma_NN) 
@@ -123,14 +135,13 @@ end
 dimension(s::Participants{A,B,C,D,E,F,G,L}) where {A,B,C,D,E,F,G,L}  = 1
 
 
-
 function Participants(n1,n2,w,s_NN,k,p)
     
     R1=n1.R    
     R2=n2.R   
 
     b=(0,R1+R2+6*w)
-    Participants(n1,n2,w,b,s_NN,k,p)
+    Participants(n1,n2,w,s_NN,k,p,b)
 end
 
 function Base.eltype(::Participants{A,B,C,D,E,F,G,L}) where {A,B,C,D,E,F,G,L} 

@@ -38,9 +38,9 @@ PProf.Allocs.pprof(prof; from_c=false)
 aa=NucleiWoodSaxon3D(10, 1.5, 5., 1., 0., 0., 0., 0., 0.)
 aa=IntegratedWoodSaxon(10,1,5.,1.,0.)
 aa=IntegratedWoodSaxonInterp(10,1,5.,1.,0.)
-bb=Threarded(aa,2*nthreads())
-cc=Threarded(aa,nthreads())
-dd=Threarded(aa,10*nthreads())
+bb=Threarded(aa,2*Threads.nthreads())
+cc=Threarded(aa,Threads.nthreads())
+dd=Threarded(aa,10*Threads.nthreads())
 
 using BenchmarkTools
 @benchmark rand($aa,10000)

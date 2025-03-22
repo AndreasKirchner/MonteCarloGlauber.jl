@@ -36,8 +36,7 @@ include("participants_distribution_refactor.jl")
 #using PProf
 
 
-export NucleiWoodSaxon3D,IntegratedWoodSaxonInterp,IntegratedWoodSaxon,Participants,Participant
-threarded, Threarded, rand 
+export NucleiWoodSaxon3D,IntegratedWoodSaxonInterp,IntegratedWoodSaxon, Participants, Participant, threarded, Threarded, rand 
 
 
 
