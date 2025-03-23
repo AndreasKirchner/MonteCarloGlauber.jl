@@ -18,11 +18,11 @@ w= 1
 s_NN=5000
 k=1
 p=0.
-b=(1,2)
+b=(10,11)
 
-participants=Participants(n1,n2,2,s_NN,k,p,b)
+participants=Participants(n1,n2,2,s_NN,k,p)
 
-event=rand(participants,1000)
+event=rand(participants,100000)
 
 b_event=map(event) do x
     impactParameter(x) 
@@ -31,6 +31,7 @@ end
 ncoll_event=map(event) do x
     x.n_coll
 end
+mean
 
 profile=map(event)   do x 
     map(Iterators.product(-10:10,-10:10)) do y
@@ -38,7 +39,28 @@ profile=map(event)   do x
     end
 end 
 
-heatmap(mean(profile))
+multiplicity=map(event)   do x 
+    sum(Iterators.product(-20:0.5:20,-20:0.5:20)) do y
+        x(y...)
+    end
+end
+
+profile=mapreduce(+,1:10000)   do _ 
+    x=rand(participants) 
+    map(Iterators.product(-10:10,-10:10)) do y
+        x(y...)
+    end
+end
+
+
+
+rand(threaded(participants))
+rand(threaded(participants),10)
+
+
+
+
+heatmap(profile)
 
 
 Plots.histogram(b_event,nbins=100)

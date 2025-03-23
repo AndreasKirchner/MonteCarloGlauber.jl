@@ -248,7 +248,7 @@ end
 
 
 
-function Distributions._rand!(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2, C, D, E, F, L}, A::AbstractVector{T}) where {NUCL1, NUCL2, C, D, E, F, L, T}
+function Distributions.rand!(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2, C, D, E, F, L}, A::AbstractVector{T}) where {NUCL1, NUCL2, C, D, E, F, L, T}
 
     for i in eachindex(A)
         A[i]= rand(rng, nucleos)
