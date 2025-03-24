@@ -28,7 +28,7 @@ include("utils.jl")
 
 
 export NucleiWoodSaxon3D,IntegratedWoodSaxonInterp,IntegratedWoodSaxon, Participants, Participant, threaded, Threaded, rand 
-export impactParameter ,multiplicity,center_of_mass
+export impactParameter ,multiplicity,center_of_mass,centralities_selection
 
 export Uranium, Lead, Gold, Copper, Xenon 
 

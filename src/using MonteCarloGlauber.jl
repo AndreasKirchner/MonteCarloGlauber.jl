@@ -51,9 +51,9 @@ end
 
 histogram(multi,nbins=100,normalize=true,yscale=:log10)
 
-obj=fit(Histogram,multi)
+obj=fit(Histogram,multi;nbins=100)
 
-obj.edges
+dump(obj)
 
 
 profile=mapreduce(+,1:10000)   do _ 
