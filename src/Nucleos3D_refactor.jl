@@ -71,7 +71,7 @@ Create a 3D distribution of nucleons in a nucleus with a Wood-Saxon density prof
 """
 function NucleiWoodSaxon3D(N_nucleon,α,R,ρ₀,w,beta2,beta3,beta4,gamma)
     rng=Random.default_rng()
-    burning_time=100000
+    burning_time=1000
     dmin=0.
     NucleiWoodSaxon3D(rng,N_nucleon,α,R,ρ₀,w,beta2,beta3,beta4,gamma,burning_time,dmin)
 end 
