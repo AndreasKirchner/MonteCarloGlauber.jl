@@ -7,7 +7,8 @@ using StaticArrays
 using OhMyThreads
 using Cuba
 using FastGaussQuadrature
- 
+
+MonteCarloGlauber.hi_andreas()
 
 
 n1= Lead()
@@ -23,15 +24,18 @@ w= 1
 s_NN=5000
 k=1
 p=0.
-b=(10,11)
+b=(0,50)
+n1.R+n1.R
+participants=Participants(n1,n2,2,s_NN,k,p,b)
 
-participants=Participants(n1,n2,2,s_NN,k,p)
-
-event=rand(threaded(participants),50_000)
+event=rand(threaded(participants),10_000)
 
 b_event=map(event) do x
     impactParameter(x) 
 end 
+histogram(b_event)
+
+
 
 ncoll_event=map(event) do x
     x.n_coll
@@ -49,6 +53,7 @@ multi=tmap(event)   do x
 end
 
 
+####this is the plot 
 histogram(multi,nbins=100,normalize=true,yscale=:log10)
 
 obj=fit(Histogram,multi;nbins=100)

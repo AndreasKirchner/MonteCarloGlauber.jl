@@ -144,7 +144,7 @@ function Participants(n1,n2,w,s_NN,k,p)
     R1=n1.R    
     R2=n2.R   
 
-    b=(0,R1+R2+6*w)
+    b=(0,3(R1+R2)+6*w)
     Participants(n1,n2,w,s_NN,k,p,b)
 end
 
@@ -166,12 +166,12 @@ end
 
 if length(b)==2
 
-    return Participants(copy(s.nucl1),copy(s.nucl2),s.sub_nucleon_width,truncated(TriangularDist(0,b[2],b[2]),b[1],b[2]),Uniform(0,2pi),s.sigma_gg,s.shape_parameter,s.total_cross_section,s.p)
+    return Participants(copy(s.nucl1),copy(s.nucl2),s.sub_nucleon_width,
+    truncated(TriangularDist(0,b[2],b[2]),b[1],b[2]),Uniform(0,2pi),s.sigma_gg,s.shape_parameter,s.total_cross_section,s.p)
 
 end
 
 end 
-
 
 
 

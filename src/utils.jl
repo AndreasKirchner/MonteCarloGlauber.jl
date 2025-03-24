@@ -94,3 +94,4 @@ function centralities_selection(events::Vector{T} ;threaded=true) where {T<:Part
     centrality_borders=map(x->x[1],multiplicity_sorted[1:n_event_per_bin:min_bias])
     return centrality_borders
 end
+
