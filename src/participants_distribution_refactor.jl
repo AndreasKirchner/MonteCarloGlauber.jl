@@ -19,16 +19,16 @@ impactParameter(x::Participant{T,S,V,M,C,D,F} ) where {T,S,V,M,C,D,F} = x.b
 
 Base.eltype(::Participant{T,S,V,M,C,D,F} ) where {T,S,V,M,C,D,F}  = promote_type(T,S)
 
-@inline function Tp(x,y,w)
+@inline @fastmath function Tp(x,y,w)
     w2=2*w^2
     1/(pi*w2)*exp(-(x^2+y^2)/w2)
 end
 
-@inline function pmeanpos(a,b,p)
+@inline @fastmath function pmeanpos(a,b,p)
     return (0.5*(a^p+b^p))^(1/p)
 end
 
-@inline function pmeanzer(a,b)
+@inline @fastmath function pmeanzer(a,b)
     return sqrt(a*b)
 end
 

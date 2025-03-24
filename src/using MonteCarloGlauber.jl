@@ -2,6 +2,10 @@
 using Statistics
 using MonteCarloGlauber
 using Plots
+using StaticArrays
+using OhMyThreads
+using Cuba
+using FastGaussQuadrature
  
 
 
@@ -22,7 +26,7 @@ b=(10,11)
 
 participants=Participants(n1,n2,2,s_NN,k,p)
 
-event=rand(participants,100000)
+event=rand(threaded(participants),50_000)
 
 b_event=map(event) do x
     impactParameter(x) 
@@ -31,7 +35,7 @@ end
 ncoll_event=map(event) do x
     x.n_coll
 end
-mean
+
 
 profile=map(event)   do x 
     map(Iterators.product(-10:10,-10:10)) do y
@@ -39,11 +43,12 @@ profile=map(event)   do x
     end
 end 
 
-multiplicity=map(event)   do x 
-    sum(Iterators.product(-20:0.5:20,-20:0.5:20)) do y
-        x(y...)
-    end
+multi=tmap(event)   do x 
+    multiplicity(x)[1]
 end
+
+
+histogram(multi,nbins=100,normalize=true,yscale=:log10)
 
 profile=mapreduce(+,1:10000)   do _ 
     x=rand(participants) 
@@ -57,6 +62,32 @@ end
 rand(threaded(participants))
 rand(threaded(participants),10)
 
+
+
+
+
+
+
+using BenchmarkTools
+
+one_profile=rand(participants)
+multiplicity(one_profile)
+@code_warntype multiplicity(one_profile)
+@benchmark multiplicity($one_profile)
+
+using Integrals
+function multiplicity_hcubature(con::T) where {T<:Participant}
+
+f(u, p) = SVector{3}(1,u[1],u[2]) .*con(u[1],u[2])
+domain = (SVector{2}(-Inf, -Inf), SVector{2}(Inf, Inf))
+    prob = IntegralProblem{false}(f, domain)
+    sol = solve(prob, GaussLegendre(); reltol = 1e-3, abstol = 1e-3)
+    sol.u
+
+
+end 
+
+@benchmark  multiplicity_hcubature($one_profile)
 
 
 
