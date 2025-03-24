@@ -1,5 +1,5 @@
 function Uranium()
-    NucleiWoodSaxon3D(238,0.6,6.81,1,0,0.280, 0.093, 0.0,0.0)
+    NucleiWoodSaxon3D(2380,0.6,6.81,1,0,0.280, 0.093, 0.0,0.0)
 end 
 
 function Copper()

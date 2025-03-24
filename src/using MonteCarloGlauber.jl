@@ -1,42 +1,83 @@
-
+using Revise
 using Statistics
 using MonteCarloGlauber
 using StatsBase
 using Plots
 using StaticArrays
 using OhMyThreads
-using Cuba
-using FastGaussQuadrature
+#using Cuba
+#using FastGaussQuadrature
  
 
 
-n1= Lead()
-n2= Uranium()
+n1= Uranium()
+n2= Copper()
 
-rand(n1)
+
+n1.R
+
+aa=rand(n1)
+scatter(aa[:,1],aa[:,2],aspectratio=1)
 
 rand(n2)
-
-rand(threaded(n1),100)
+n1.R
 
 w= 1
-s_NN=5000
+s_NN=3400
 k=1
-p=0.
-b=(10,11)
+p=2
+b=(0,40)
 
-participants=Participants(n1,n2,2,s_NN,k,p)
+n1.R+n2.R+6w
 
-event=rand(threaded(participants),50_000)
+n1.R+n2.R
+
+MonteCarloGlauber.cross_section_from_energy(3400)
+MonteCarloGlauber.cross_section_from_energy(5000)
+n1= Lead()
+n2= Lead()
+
+participants=Participants(n1,n2,w,s_NN,k,p)
+
+participants
+
+event=rand(threaded(participants),10000)
 
 b_event=map(event) do x
     impactParameter(x) 
 end 
 
+histogram(b_event,nbins=100)
+
 ncoll_event=map(event) do x
     x.n_coll
 end
 
+rand()
+
+using Distributions
+
+a1=10*sqrt.(rand(100000))
+histogram(a1,bins=100)
+aa=truncated(TriangularDist(0,10,10),0,10)
+a2=rand(aa,100000)
+histogram(a1,bins=100)
+histogram!(a2,bins=100)
+
+
+x1=rand(Uniform(-10,10),100000)
+x2=rand(Uniform(-10,10),100000)
+b=sqrt.(x1 .^2 .+ x2 .^2)
+histogram!(b,normalize=true)
+histogram(a1,bins=100,normalize=true)
+histogram!(a2,bins=100,normalize=true)
+
+dd=sqrt.(Uniform(0,1))
+dd=Uniform(0,1)
+
+rand(dd,12)
+
+n1.R
 
 profile=map(event)   do x 
     map(Iterators.product(-10:10,-10:10)) do y
@@ -45,7 +86,7 @@ profile=map(event)   do x
 end 
 
 multi=tmap(event)   do x 
-    multiplicity(x)
+    multiplicity(x,Nr=50,Nth=15)
 end
 
 

@@ -123,7 +123,7 @@ function Participants(n1,n2,w,s_NN,k,p,b)
     sigma_NN=cross_section_from_energy(s_NN)
     f(sigmagg,p)=totalcross_section(w,sigmagg,sigma_NN) 
     u0 = 1.
-    prob = NonlinearProblem{false}(f, u0)
+    prob = NonlinearProblem(f, u0)
     sol=solve(prob,SimpleNewtonRaphson())
 
     sigg=sol.u
@@ -132,7 +132,8 @@ function Participants(n1,n2,w,s_NN,k,p,b)
     return Participants(n1,n2,w,TriangularDist(b,b,b),Uniform(0,2pi),sigg,k,sigma_NN,p)
     end 
 
-    return Participants(n1,n2,w,truncated(TriangularDist(0,b[2],b[2]),b[1],b[2]),Uniform(0,2pi),sigg,k,Float64(sigma_NN),p)
+    return Participants(n1,n2,w,truncated(TriangularDist(0,b[2],b[2]),b[1],b[2]),Uniform(0,2pi),sigg,k,sigma_NN,p)
+    #Participants(n1,n2,w,truncated(TriangularDist(0,b[2],b[2]),b[1],b[2]),Uniform(0,2pi),sigg,k,Float64(sigma_NN),p)
 end 
 
 
@@ -180,6 +181,7 @@ end
     #(4*pi*w^2* (Base.MathConstants.γ - expinti(-(sigmagg/(4pi* w^2))) + log(sigmagg/(4pi* w^2))))
 
     C=6 #truncation for integral
+    @show sigmaGG
     return C^2/4 + expinti(-exp(-C^2/4)*sigmaGG/(4*pi*w^2)) - expinti(-sigmaGG/(4*pi*w^2)) -sigmaNN/(4*pi*w^2)
 
 end 
@@ -225,8 +227,10 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
             y_2=pos2rotshift[2]
             impact_par=hypot(x_1-x_2,y_1-y_2)
             probability=binary_impact_parameter_probability(impact_par,nucleos)
+           
             #accepted 
-            if rand(rng,Bernoulli(probability))   
+            if rand(rng,Bernoulli(probability))  
+                #@show probability, impact_par
                 push!(re1,SVector{2}(x_1,y_1))
                 push!(re2,SVector{2}(x_2,y_2))  
                 ncoll+=1 

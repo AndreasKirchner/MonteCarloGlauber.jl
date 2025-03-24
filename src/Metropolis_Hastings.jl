@@ -65,7 +65,7 @@ function mcmcaccept(rng::AbstractRNG,prob,s::Metropolis_Hastings{DIM,T,S,D,M,uTy
     end  
 
     #return mcmcaccept(rng,prob,s)
-      prob=newprob
+      #prob=newprob
 
     end
 
