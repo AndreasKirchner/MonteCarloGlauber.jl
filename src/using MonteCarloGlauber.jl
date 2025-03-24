@@ -1,6 +1,7 @@
 
 using Statistics
 using MonteCarloGlauber
+using StatsBase
 using Plots
 using StaticArrays
 using OhMyThreads
@@ -44,11 +45,16 @@ profile=map(event)   do x
 end 
 
 multi=tmap(event)   do x 
-    multiplicity(x)[1]
+    multiplicity(x)
 end
 
 
 histogram(multi,nbins=100,normalize=true,yscale=:log10)
+
+obj=fit(Histogram,multi)
+
+obj.edges
+
 
 profile=mapreduce(+,1:10000)   do _ 
     x=rand(participants) 
