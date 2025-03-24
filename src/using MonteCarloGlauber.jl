@@ -5,9 +5,10 @@ using StatsBase
 using Plots
 using StaticArrays
 using OhMyThreads
-#using Cuba
-#using FastGaussQuadrature
- 
+using Cuba
+using FastGaussQuadrature
+
+MonteCarloGlauber.hi_andreas()
 
 
 n1= Uranium()
@@ -25,29 +26,19 @@ n1.R
 w= 1
 s_NN=3400
 k=1
-p=2
-b=(0,40)
+p=0.
+b=(0,50)
+n1.R+n1.R
+participants=Participants(n1,n2,2,s_NN,k,p,b)
 
-n1.R+n2.R+6w
-
-n1.R+n2.R
-
-MonteCarloGlauber.cross_section_from_energy(3400)
-MonteCarloGlauber.cross_section_from_energy(5000)
-n1= Lead()
-n2= Lead()
-
-participants=Participants(n1,n2,w,s_NN,k,p)
-
-participants
-
-event=rand(threaded(participants),10000)
+event=rand(threaded(participants),10_000)
 
 b_event=map(event) do x
     impactParameter(x) 
 end 
+histogram(b_event)
 
-histogram(b_event,nbins=100)
+
 
 ncoll_event=map(event) do x
     x.n_coll
@@ -90,6 +81,7 @@ multi=tmap(event)   do x
 end
 
 
+####this is the plot 
 histogram(multi,nbins=100,normalize=true,yscale=:log10)
 
 obj=fit(Histogram,multi;nbins=100)
