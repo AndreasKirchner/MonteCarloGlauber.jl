@@ -5,39 +5,146 @@ using StatsBase
 using Plots
 using StaticArrays
 using OhMyThreads
-using Cuba
-using FastGaussQuadrature
+using DifferentiationInterface
+using IterTools
+using BenchmarkTools
+#using Cuba
+#using FastGaussQuadrature
 
-MonteCarloGlauber.hi_andreas()
-
-
-n1= Uranium()
-n2= Copper()
-
-
-n1.R
-
-aa=rand(n1)
-scatter(aa[:,1],aa[:,2],aspectratio=1)
-
-rand(n2)
-n1.R
-
-w= 1
-s_NN=3400
+n1= Lead()
+n2= Lead()
+w= 0.5
+s_NN=2760
 k=1
-p=0.
-b=(0,50)
-n1.R+n1.R
-participants=Participants(n1,n2,2,s_NN,k,p,b)
+p=1.
+MonteCarloGlauber.cross_section_from_energy(s_NN)
+participants=Participants(n1,n2,w,s_NN,k,p)
+event=rand(threaded(participants),5000)
+aba, acom=MonteCarloGlauber.centralities_selection_CoM(event,[10])
+energy(T)=3*8*pi^2/15 *(3^2 -1 +7/4* 3*3)*T^4/(2*3*4)
+Te4=MonteCarloGlauber.InverseFunction(energy)
 
-event=rand(threaded(participants),10_000)
+bb=MonteCarloGlauber.generate_background(Te4,1,aba,acom;r_grid=0:1:10)
+plot(bb)
+corr=MonteCarloGlauber.generate_2ptfct(Te,1,aba,acom,[2,3,4];r_grid=0:0.1:5)
+size(corr)
+size(corr[1])
+size(corr[1][1])
+corr[1][1][1][1]
+length(corr)
+heatmap(real.(corr[1][1]))
+
+shape(corr)
+
+heatmap(imag.(corr[1][1]))
+bb[1][1]
+
+using MonteCarloGlauber
+bg,twpt=MonteCarloGlauber.generate_bg_two_pt_fct(Te,Te,1,Lead(),Lead(),w,k,p,s_NN,[10,20],[2,3,4];minBiasEvents=5000,r_grid=0:0.5:5)
+
+heatmap(real.(permutedims(hcat(twpt[1][1]...))))
+
+
 
 b_event=map(event) do x
     impactParameter(x) 
 end 
 histogram(b_event)
 
+multi=tmap(event)   do x 
+    multiplicity(x,Nr=50,Nth=15)[1]
+end
+
+multi=tmap(event)   do x 
+    multiplicity(x,Nr=50,Nth=15)
+end
+
+using DelimitedFiles
+dat=readdlm("BKG276TeVAvgCC1.txt")
+
+plot(dat[:,2])
+
+aba, acom=MonteCarloGlauber.centralities_selection_CoM(event,[10])
+
+energy(T)=3*8*pi^2/15 *(3^2 -1 +7/4* 3*3)*T^4/(2*3*4)
+Te4=MonteCarloGlauber.InverseFunction(energy)
+energy(1)
+energy2(T)=T
+Te=InverseFunction(energy2)
+
+energy.([1,2,3])
+Te4(1)
+Te.([1,2,3])
+
+bb=MonteCarloGlauber.generate_background(Te4,1,aba,acom;r_grid=0:1:10)
+plot(bb,label="new")
+plot!(dat[:,2],label="old")
+plot!(1.5 .*dat[:,2],label="old*1.5")
+
+sum(dat[:,2])*0.1
+
+mean(i->aba[1][i](0,0),1:length(aba[1]))
+
+bb
+bbb=acom[1]
+
+bbb[1][2]
+
+for (index, value) in mean(enumerate(aba[1]))
+    index
+end
+
+aba[1][1](0,-1)
+
+tl=("a","b","c","d")
+
+sum(enumerate(aba[1])) do (i,conf)
+    i
+end
+
+mean(enumerate(aba[1])) do (i,conf)
+    i
+end
+
+
+1+2+3+4
+
+enumerate(tl) do i 
+    i
+end
+
+bs=for (i,conf) in enumerate(tl)
+   i
+end
+
+bs
+
+grid=0:1:4
+MonteCarloGlauber.generatingfunction(aba[1],1,0:1:3,0.5,acom[1],Te4,1)
+bb=MonteCarloGlauber.generate_background(Te4,1,aba,acom;r_grid=0:1:3)
+aba[1]
+acom
+####this is the plot 
+histogram(multi,nbins=100,normalize=true,yscale=:log10)
+
+
+
+obj=fit(Histogram,multi;nbins=100)
+
+dump(obj)
+
+
+profile=mapreduce(+,1:10000)   do _ 
+    x=rand(participants) 
+    map(Iterators.product(-10:10,-10:10)) do y
+        x(y...)
+    end
+end
+
+
+
+rand(threaded(participants))
+rand(threaded(participants),10)
 
 
 ncoll_event=map(event) do x
@@ -75,33 +182,6 @@ profile=map(event)   do x
         x(y...)
     end
 end 
-
-multi=tmap(event)   do x 
-    multiplicity(x,Nr=50,Nth=15)
-end
-
-
-####this is the plot 
-histogram(multi,nbins=100,normalize=true,yscale=:log10)
-
-obj=fit(Histogram,multi;nbins=100)
-
-dump(obj)
-
-
-profile=mapreduce(+,1:10000)   do _ 
-    x=rand(participants) 
-    map(Iterators.product(-10:10,-10:10)) do y
-        x(y...)
-    end
-end
-
-
-
-rand(threaded(participants))
-rand(threaded(participants),10)
-
-
 
 
 
@@ -294,3 +374,149 @@ end
 minimum(ncoll)
 
 dump(asdassdd[findmin(ncoll)[2]])
+
+
+function fluctuating_thickness!(out::V,part::T,grid_x::S,grid_y::R) where {V<:AbstractArray,T<:Participant,S<:AbstractVector,R<:AbstractVector}
+    
+    #part1=part.part1
+    #part2=part.part2
+    #shape1=part.shape1
+    #shape2=part.shape2
+    #w= part.sub_nucleon_width
+    #p=part.p
+
+    #function Tp(x,y)
+    #    w2=2*w^2
+    #    1/(pi*w2)*exp(-(x^2+y^2)/w2)
+    #end
+
+    @inbounds for i in eachindex(grid_x)
+        x=grid_x[i]
+        @inbounds for j in eachindex(grid_y)
+            y=grid_y[j]
+            
+            #ta=sum(zip(part1,shape1)) do (pa ,ga)
+            #    ga*Tp(x-pa[1],y-pa[2])
+            #end 
+
+            #tb=sum(zip(part2,shape2)) do (pa ,ga)
+            #    ga*Tp(x-pa[1],y-pa[2])
+            #end 
+            
+            #@show typeof(part2 )
+            #tb=sum(zip(part2,shape2)) do pb ,gb
+            #    gb*Tp(x-pb[1],y-pb[2])
+            #end
+            out[i,j]= part(x,y)#norm((ta,tb),p) #((ta^p+tb^p)/2)^(1/p)
+        end 
+    end
+
+    return nothing
+
+end
+
+function fluctuating_thickness_threads!(out::V,part::T,grid_x::S,grid_y::R) where {V<:AbstractArray,T<:Participant,S<:AbstractVector,R<:AbstractVector}
+    
+    #part1=part.part1
+    #part2=part.part2
+    #shape1=part.shape1
+    #shape2=part.shape2
+    #w= part.sub_nucleon_width
+    #p=part.p
+
+    #function Tp(x,y)
+    #    w2=2*w^2
+    #    1/(pi*w2)*exp(-(x^2+y^2)/w2)
+    #end
+
+    cart = CartesianIndices(out)
+    tmap!(out, eachindex(out)) do idx
+        c = cart[idx]
+        x=grid_x[c[1]]
+        y=grid_x[c[2]]
+        part(x,y)
+    end
+    
+
+    return nothing
+
+end
+
+
+
+function fluctuating_thickness!(out::V,part::T,grid_x::S) where {V<:AbstractArray,T<:Participant,S<:AbstractVector}
+    
+    fluctuating_thickness!(out,part,grid_x,grid_x) 
+end
+
+function fluctuating_thickness_threads!(out::V,part::T,grid_x::S) where {V<:AbstractArray,T<:Participant,S<:AbstractVector}
+    
+    fluctuating_thickness_threads!(out,part,grid_x,grid_x) 
+end
+
+
+function fluctuating_thickness(part::T,grid_x::S,grid_y::R) where {T<:Participant,S<:AbstractVector,R<:AbstractVector}
+    out=Matrix{eltype(part)}(undef,length(grid_x),length(grid_y))
+    
+    fluctuating_thickness!(out,part,grid_x,grid_y)
+    return out 
+end
+
+function fluctuating_thickness_threads(part::T,grid_x::S,grid_y::R) where {T<:Participant,S<:AbstractVector,R<:AbstractVector}
+    out=Matrix{eltype(part)}(undef,length(grid_x),length(grid_y))
+    
+    fluctuating_thickness_threads!(out,part,grid_x,grid_y)
+    return out 
+end
+
+function fluctuating_thickness(part::T,grid_x::S) where {T<:Participant,S<:AbstractVector}
+    
+    fluctuating_thickness(part,grid_x,grid_x)
+    
+end
+
+function fluctuating_thickness_threads(part::T,grid_x::S) where {T<:Participant,S<:AbstractVector}
+    
+    fluctuating_thickness_threads(part,grid_x,grid_x)
+    
+end
+
+function fluctuating_thickness(part::Vector{T},grid_x::S,grid_y::R)where {T<:Participant,S<:AbstractVector,R<:AbstractVector}
+    map(x->fluctuating_thickness(x,grid_x,grid_y),part)
+end 
+
+function fluctuating_thickness_threads(part::Vector{T},grid_x::S,grid_y::R)where {T<:Participant,S<:AbstractVector,R<:AbstractVector}
+    tmap(x->fluctuating_thickness(x,grid_x,grid_y),part)
+end 
+
+function fluctuating_thickness(part::Vector{T},grid_x::S)where {T<:Participant,S<:AbstractVector}
+    map(x->fluctuating_thickness(x,grid_x,grid_x),part)
+end
+
+function fluctuating_thickness_threads(part::Vector{T},grid_x::S)where {T<:Participant,S<:AbstractVector}
+    tmap(x->fluctuating_thickness(x,grid_x,grid_x),part)
+end
+
+mm=fluctuating_thickness(aba[1][2],-10:0.1:10,-10:0.1:10)
+mm4=fluctuating_thickness(aba[2][1],-10:0.1:10,-10:0.1:10)
+
+heatmap(mm)
+heatmap(mm4)
+
+using HDF5
+close(fid)
+fid = h5open("test_profs.h5", "r")
+tprof=read(fid)["event_1"]
+heatmap(tprof)
+p1=heatmap(read(fid)["event_0"])
+p2=heatmap(read(fid)["event_2"])
+p3=heatmap(read(fid)["event_3"])
+p4=heatmap(read(fid)["event_4"])
+p5=heatmap(read(fid)["event_5"])
+p6=heatmap(read(fid)["event_6"])
+p7=heatmap(read(fid)["event_7"])
+p8=heatmap(read(fid)["event_8"])
+plot(p1,p2,p3,p4,p5,p6,p7,p8,size=(900,900))
+keys(fid)
+
+tprof["Event_1"]
