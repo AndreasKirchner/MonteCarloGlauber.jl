@@ -181,6 +181,7 @@ end
     #(4*pi*w^2* (Base.MathConstants.γ - expinti(-(sigmagg/(4pi* w^2))) + log(sigmagg/(4pi* w^2))))
 
     C=6 #truncation for integral
+    
     return C^2/4 + expinti(-exp(-C^2/4)*sigmaGG/(4*pi*w^2)) - expinti(-sigmaGG/(4*pi*w^2)) -sigmaNN/(4*pi*w^2)
 
 end 
