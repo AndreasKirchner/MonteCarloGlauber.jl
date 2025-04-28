@@ -286,3 +286,25 @@ function generate_bg_two_pt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,
     #twoPtFct=map(m->map(cc->map(r1->map(r2->twoPtFct_entropy[m][cc][r1][r2],1:length(r_grid)),1:length(r_grid)),1:length(bg)),1:length(mList))
     return bg,twoPtFct
 end
+
+
+
+function save_bg_two_pt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins,mList;minBiasEvents=1000000,r_grid=0:1:10,step=2pi/20,Threaded=true)
+    participants=Participants(Projectile1,Projectile2,w,sqrtS,k,p)
+    #if threaded
+        events=rand(threaded(participants),minBiasEvents)
+    #else
+     #   events=rand(participants,minBiasEvents)
+    #end
+    batches, CoM=centralities_selection_CoM(events,bins;Threaded=Threaded)
+    bg=generate_background(f,norm,batches,CoM,r_grid=r_grid,step=step)
+    twoPtFct_entropy=generate_2ptfct(norm,batches, CoM,mList;r_grid=r_grid,step=step)
+    twoPtFct=map(m->map(cc->map(r1->map(r2->twoPtFct_entropy[m][cc][r1,r2]*delta_factor(bg[cc][r1])*delta_factor(bg[cc][r2]),1:length(r_grid)),1:length(r_grid)),1:length(bg)),1:length(mList))
+    bgString,twoptString=construct_trento_names(participants;extensionString="dat",mMode="2")
+    writedlm(bgString,bg)
+    for i in 1:mList
+        bgString,twoptString=construct_trento_names(participants;extensionString="dat",mMode=mList[i])
+        writedlm(twoptString,twoPtFct[i])
+    end
+
+end
