@@ -11,7 +11,6 @@ using BenchmarkTools
 using DelimitedFiles
 #using Cuba
 #using FastGaussQuadrature
-
 n1= Lead()
 n2= Lead()
 w= 0.5
@@ -19,9 +18,16 @@ s_NN=2760
 k=1
 p=1.
 
+
 bg,twpt=MonteCarloGlauber.generate_bg_two_pt_fct(energy2,energy2,1,Lead(),Lead(),w,k,p,s_NN,[10,20],[2,3,4];minBiasEvents=5000,r_grid=0:1:10)
 
-MonteCarloGlauber.save_bg_two_pt_fct(energy2,energy2,1,Lead(),Lead(),w,k,p,s_NN,[10,20],[2,3,4];minBiasEvents=5000,r_grid=0:1:10)
+MonteCarloGlauber.save_bg_two_pt_fct(energy2,energy2,1,Lead(),Lead(),w,k,p,s_NN,[10,20],[2,3,4];minBiasEvents=1000,r_grid=0:1:4)
+using DelimitedFiles
+aa=readdlm("trento_two_pt_fct_m_2_Pb_Pb_w_0_5_sNN_6_206_p_1_0_k_1.dat")
+
+aa
+
+aa[1]
 
 plot(bg[1],label="0-10")
 plot!(bg[2],label="10-20")

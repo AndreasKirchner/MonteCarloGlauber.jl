@@ -302,9 +302,9 @@ function save_bg_two_pt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sq
     twoPtFct=map(m->map(cc->map(r1->map(r2->twoPtFct_entropy[m][cc][r1,r2]*delta_factor(bg[cc][r1])*delta_factor(bg[cc][r2]),1:length(r_grid)),1:length(r_grid)),1:length(bg)),1:length(mList))
     bgString,twoptString=construct_trento_names(participants;extensionString="dat",mMode="2")
     writedlm(bgString,bg)
-    for i in 1:mList
+    for i in 1:length(mList)
         bgString,twoptString=construct_trento_names(participants;extensionString="dat",mMode=mList[i])
-        writedlm(twoptString,twoPtFct[i])
+        writedlm(twoptString,real.(twoPtFct[i]))
     end
 
 end
