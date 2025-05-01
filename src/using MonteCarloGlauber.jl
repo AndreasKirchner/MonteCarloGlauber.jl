@@ -18,8 +18,9 @@ s_NN=2760
 k=1
 p=1.
 MonteCarloGlauber.cross_section_from_energy(s_NN)
-participants=Participants(n1,n2,w,s_NN,k,p)
-event=rand(threaded(participants),5000)
+
+participants=Participants(n1,n2,w,s_NN,k,p,(0.1,6.8))
+event=rand(threaded(participants),500)
 aba, acom=MonteCarloGlauber.centralities_selection_CoM(event,[10])
 energy(T)=3*8*pi^2/15 *(3^2 -1 +7/4* 3*3)*T^4/(2*3*4)
 Te4=MonteCarloGlauber.InverseFunction(energy)

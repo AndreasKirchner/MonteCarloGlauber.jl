@@ -137,6 +137,7 @@ function Participants(n1,n2,w,s_NN,k,p,b)
 end 
 
 
+
 dimension(s::Participants{A,B,C,D,E,F,G,L}) where {A,B,C,D,E,F,G,L}  = 1
 
 
@@ -156,8 +157,11 @@ end
 
 
 
+
 function Base.copy(s::Participants{A,B,C,D,E,F,G,L}) where {A,B,C,D,E,F,G,L} 
-b=unique(Distributions.params(s.inpact_parameter_magitude))
+
+
+    b=unique(Distributions.params(s.inpact_parameter_magitude))
 
 if length(b)==1
     
