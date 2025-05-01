@@ -8,15 +8,31 @@ using OhMyThreads
 using DifferentiationInterface
 using IterTools
 using BenchmarkTools
+using DelimitedFiles
 #using Cuba
 #using FastGaussQuadrature
-
 n1= Lead()
 n2= Lead()
 w= 0.5
 s_NN=2760
 k=1
 p=1.
+
+
+bg,twpt=MonteCarloGlauber.generate_bg_two_pt_fct(energy2,energy2,1,Lead(),Lead(),w,k,p,s_NN,[10,20],[2,3,4];minBiasEvents=5000,r_grid=0:1:10)
+
+MonteCarloGlauber.save_bg_two_pt_fct(energy2,energy2,1,Lead(),Lead(),w,k,p,s_NN,[10,20],[2,3,4];minBiasEvents=1000,r_grid=0:1:4)
+using DelimitedFiles
+aa=readdlm("trento_two_pt_fct_m_2_Pb_Pb_w_0_5_sNN_6_206_p_1_0_k_1.dat")
+
+aa
+
+aa[1]
+
+plot(bg[1],label="0-10")
+plot!(bg[2],label="10-20")
+heatmap(real.(permutedims(hcat(twpt[1][1]...))))
+
 MonteCarloGlauber.cross_section_from_energy(s_NN)
 
 participants=Participants(n1,n2,w,s_NN,k,p,(0.1,6.8))
@@ -25,15 +41,21 @@ aba, acom=MonteCarloGlauber.centralities_selection_CoM(event,[10])
 energy(T)=3*8*pi^2/15 *(3^2 -1 +7/4* 3*3)*T^4/(2*3*4)
 Te4=MonteCarloGlauber.InverseFunction(energy)
 
-bb=MonteCarloGlauber.generate_background(Te4,1,aba,acom;r_grid=0:1:10)
+bb=MonteCarloGlauber.generate_background(Te4,1,aba,acom;r_grid=0:0.1:10)
 plot(bb)
-corr=MonteCarloGlauber.generate_2ptfct(Te,1,aba,acom,[2,3,4];r_grid=0:0.1:5)
+corr=MonteCarloGlauber.generate_2ptfct(Te4,1,aba,acom,[2,3,4];r_grid=0:0.5:5)
+heatmap(real.(corr[1][1]))
+bg
+
+writedlm("bg.dat",bg)
+aaa=readdlm("bg.dat")
+
+
 size(corr)
 size(corr[1])
 size(corr[1][1])
 corr[1][1][1][1]
 length(corr)
-heatmap(real.(corr[1][1]))
 
 shape(corr)
 

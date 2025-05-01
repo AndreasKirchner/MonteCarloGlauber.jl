@@ -1,9 +1,10 @@
 name = "MonteCarloGlauber"
-uuid = "975a0a4c-3350-41ca-9a50-68f91c961bd0"
-authors = ["Eduardo Grossi", "Andreas Kirchner"]
-version = "1.0.0-DEV"
+uuid = "7906afbe-8d59-45d8-8dba-18822744ba34"
+authors = ["AndreasKirchner <anki11@arcor.de>"]
+version = "0.1.0"
 
 [deps]
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 DifferentiationInterface = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
@@ -18,22 +19,16 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
-DifferentiationInterface = "0.6.32"
-Distributions = "0.25.117"
+DelimitedFiles = "1.9.1"
+DifferentiationInterface = "0.6.52"
+Distributions = "0.25.119"
 Interpolations = "0.15.1"
 LinearAlgebra = "1.11.0"
-OhMyThreads = "0.7.0"
-QuadGK = "2.11.1"
+OhMyThreads = "0.8.3"
+QuadGK = "2.11.2"
 Random = "1.11.0"
 Rotations = "1.7.1"
-SimpleNonlinearSolve = "2.1.0"
-SpecialFunctions = "2.5.0"
-StaticArrays = "1.9.10"
+SimpleNonlinearSolve = "2.3.0"
+SpecialFunctions = "2.5.1"
+StaticArrays = "1.9.13"
 StatsBase = "0.34.4"
-julia = "1.10"
-
-[extras]
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-
-[targets]
-test = ["Test"]
