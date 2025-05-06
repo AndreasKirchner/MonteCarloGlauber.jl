@@ -287,6 +287,18 @@ function generate_bg_two_pt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,
     return bg,twoPtFct
 end
 
+function generate_bg(f,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins;minBiasEvents=1000000,r_grid=0:1:10,step=2pi/10,Threaded=true)
+    #batches, CoM=batched_events(Projectile1,Projectile2,w,k,p,sqrtS,bins;minBiasEvents=minBiasEvents)
+    participants=Participants(Projectile1,Projectile2,w,sqrtS,k,p)
+    #if threaded
+        events=rand(threaded(participants),minBiasEvents)
+    #else
+    #    events=rand(participants,minBiasEvents)
+    #end
+    batches, CoM=centralities_selection_CoM(events,bins;Threaded=Threaded)
+    bg=generate_background(f,norm,batches,CoM,r_grid=r_grid,step=step)
+    return bg
+end
 
 
 function save_bg_two_pt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins,mList;minBiasEvents=1000000,r_grid=0:1:10,step=2pi/20,Threaded=true)

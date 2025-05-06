@@ -15,11 +15,50 @@ n1= Lead()
 n2= Lead()
 w= 0.5
 s_NN=2760
-k=1
+k=10
 p=1.
 
+rand(threaded(n1),100)
+participants=Participants(n1,n2,2,s_NN,k,p)
+event=rand(participants,100)
+b_event=map(event) do x
+    impactParameter(x) 
+end 
 
-bg,twpt=MonteCarloGlauber.generate_bg_two_pt_fct(energy2,energy2,1,Lead(),Lead(),w,k,p,s_NN,[10,20],[2,3,4];minBiasEvents=5000,r_grid=0:1:10)
+ncoll_event=map(event) do x
+    x.n_coll
+end
+
+profile=map(event)   do x 
+    map(Iterators.product(-10:0.5:10,-10:0.5:10)) do y
+        x(y...)
+    end
+end
+using Plots 
+
+heatmap(mean(profile))
+
+heatmap(profile[1])
+heatmap(profile[2])
+heatmap(profile[3])
+heatmap(profile[4])
+
+
+
+Plots.histogram(b_event,nbins=100)
+Plots.histogram(ncoll_event,nbins=100,normalize=true,yaxis=:log)
+
+bg,twpt=MonteCarloGlauber.generate_bg_two_pt_fct(energy2,energy2,1,Lead(),Lead(),w,k,p,s_NN,[10,20],[2];minBiasEvents=5000,r_grid=0:0.2:10)
+
+using MonteCarloGlauber
+using BenchmarkTools
+
+bg2=MonteCarloGlauber.generate_bg(energy2,1,Lead(),Lead(),w,k,p,s_NN,[10,20,30,40];minBiasEvents=5000,r_grid=0:0.1:10)
+
+plot(bg2[1])
+plot!(bg2[2])
+plot!(bg2[3])
+plot!(bg2[4])
 
 MonteCarloGlauber.save_bg_two_pt_fct(energy2,energy2,1,Lead(),Lead(),w,k,p,s_NN,[10,20],[2,3,4];minBiasEvents=1000,r_grid=0:1:4)
 using DelimitedFiles
