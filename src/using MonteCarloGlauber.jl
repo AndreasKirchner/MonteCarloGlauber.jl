@@ -15,12 +15,25 @@ n1= Lead()
 n2= Lead()
 w= 0.5
 s_NN=2760
-k=10
+k=0.01
 p=1.
 
 rand(threaded(n1),100)
 participants=Participants(n1,n2,2,s_NN,k,p)
-event=rand(participants,100)
+
+heatmap(event[1])
+
+participants=Participants(n1,n2,2,s_NN,k,p,0)
+event=rand(participants,10)
+profile=map(event)   do x 
+    map(Iterators.product(-10:0.5:10,-10:0.5:10)) do y
+        x(y...)
+    end
+end
+heatmap(-10:0.5:10,-10:0.5:10,profile[3])
+
+
+
 b_event=map(event) do x
     impactParameter(x) 
 end 
