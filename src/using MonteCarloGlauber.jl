@@ -623,3 +623,69 @@ plot(p1,p2,p3,p4,p5,p6,p7,p8,size=(900,900))
 keys(fid)
 
 tprof["Event_1"]
+
+
+
+
+
+
+
+
+
+
+
+
+
+using MonteCarloGlauber
+using Statistics
+using MonteCarloGlauber
+using Plots
+
+n1= Lead()
+n2= Lead()
+rand(n1)
+rand(n2)
+
+rand(n1,100)
+
+rand(threaded(n1),100)
+
+w= 1
+s_NN=5000
+k=1
+p=0.
+b=(1,2)
+
+participants=Participants(n1,n2,w,s_NN,k,p,b)
+
+participants=threaded(Participants(n1,n2,w,s_NN,k,p))
+event=rand(participants,1000)
+
+b_event=map(event) do x
+    impactParameter(x) 
+end 
+histogram(b_event,nbins=100)
+
+ncoll_event=map(event) do x
+    x.n_coll
+end
+histogram(ncoll_event,nbins=100,yscale=:log10)
+
+profile=map(event)   do x 
+    map(Iterators.product(-10:0.5:10,-10:0.5:10)) do y
+        x(y...)
+    end
+end
+heatmap(-10:0.5:10,-10:0.5:10,profile[4])
+
+b_event=map(1:1000) do x
+    impactParameter(rand(participants))
+end 
+
+energy2(T)=T
+bg,twpt=generate_bg_two_pt_fct(energy2,energy2,1,Lead(),Lead(),w,k,p,s_NN,[10,20],[2];minBiasEvents=1000,r_grid=0:1:10,nFields=3,n_ext_Grid=20)
+
+plot(0:1:10,bg[1])
+plot!(0:1:10,bg[2])
+
+heatmap(twpt[1,1,1,:,:])

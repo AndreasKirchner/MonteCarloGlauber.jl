@@ -64,27 +64,21 @@ or the histogram for the number of collisions
 ncoll_event=map(event) do x
     x.n_coll
 end
-histogram(ncoll_event,nbins=100)
+histogram(ncoll_event,nbins=100,yscale=:log10)
 ```
 We can also plot the events by evaluating them on a grid
 ```julia
 profile=map(event)   do x 
-    map(Iterators.product(-10:0.1:10,-10:0.1:10)) do y
+    map(Iterators.product(-10:0.5:10,-10:0.5:10)) do y
         x(y...)
     end
 end
-heatmap(profile[1])
-```
-It is also possible to generate these things on the fly efficiently
-```julia
-b_event=map(1:1000) do x
-    impactParameter(rand(participants))
-end 
+heatmap(-10:0.5:10,-10:0.5:10,profile[1])
 ```
 It is also possible to generate the background configuration and two point correlation function used in the FluiduM code via
 ```julia
 energy2(T)=T
-bg,twpt=generate_bg_two_pt_fct(energy2,energy2,1,Lead(),Lead(),w,k,p,s_NN,[10,20],[2];minBiasEvents=1000,r_grid=0:1:10,nFields=3,n_ext_Grid=100)
+bg,twpt=generate_bg_two_pt_fct(energy2,energy2,1,Lead(),Lead(),w,k,p,s_NN,[10,20],[2];minBiasEvents=1000,r_grid=0:1:10,nFields=3,n_ext_Grid=20)
 
 ```
 We can also plot the background
