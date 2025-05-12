@@ -15,22 +15,26 @@ n1= Lead()
 n2= Lead()
 w= 0.5
 s_NN=2760
-k=0.01
-p=1.
+k=1
+p=0.0
 
 rand(threaded(n1),100)
 participants=Participants(n1,n2,2,s_NN,k,p)
 
 heatmap(event[1])
 
-participants=Participants(n1,n2,2,s_NN,k,p,0)
+participants=Participants(n1,n2,w,s_NN,k,p)
 event=rand(participants,10)
 profile=map(event)   do x 
-    map(Iterators.product(-10:0.5:10,-10:0.5:10)) do y
+    map(Iterators.product(-10:0.1:10,-10:0.1:10)) do y
         x(y...)
     end
 end
-heatmap(-10:0.5:10,-10:0.5:10,profile[3])
+heatmap(-10:0.1:10,-10:0.1:10,profile[1])
+heatmap(-10:0.1:10,-10:0.1:10,profile[2])
+heatmap(-10:0.1:10,-10:0.1:10,profile[3])
+heatmap(-10:0.1:10,-10:0.1:10,profile[4])
+
 
 
 
