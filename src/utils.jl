@@ -270,6 +270,8 @@ function generate_2ptfct(norm,batches, CoM,mList;r_grid=0:1:10,step=2pi/50)
 end
 
 
+
+
 function generate_bg_two_pt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins,mList;minBiasEvents=1000000,r_grid=0:1:10,step=2pi/20,Threaded=true,n_ext_Grid=0,nFields=10)
     #batches, CoM=batched_events(Projectile1,Projectile2,w,k,p,sqrtS,bins;minBiasEvents=minBiasEvents)
     if (length(bins)+1)*100>minBiasEvents

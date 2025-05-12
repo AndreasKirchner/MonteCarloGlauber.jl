@@ -56,7 +56,7 @@ heatmap(profile[2])
 heatmap(profile[3])
 heatmap(profile[4])
 
-
+generate_bg_two_pt_fct()
 
 Plots.histogram(b_event,nbins=100)
 Plots.histogram(ncoll_event,nbins=100,normalize=true,yaxis=:log)
