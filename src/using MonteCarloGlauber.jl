@@ -60,15 +60,39 @@ heatmap(profile[4])
 
 Plots.histogram(b_event,nbins=100)
 Plots.histogram(ncoll_event,nbins=100,normalize=true,yaxis=:log)
-
+energy2(T)=T
 bg,twpt=MonteCarloGlauber.generate_bg_two_pt_fct(energy2,energy2,1,Lead(),Lead(),w,k,p,s_NN,[10,20],[2];minBiasEvents=5000,r_grid=0:0.2:10)
+using MonteCarloGlauber
+bg2,twpt2=MonteCarloGlauber.generate_bg_two_pt_fct(energy2,energy2,1,Lead(),Lead(),w,k,p,s_NN,[10,20],[2];minBiasEvents=100,r_grid=0:1:10,nFields=3,n_ext_Grid=100)
+heatmap(twpt2[1,1,1,:,:])
+# the correlator has m, centra, r, r 
+# we want n complex, n field, nm, nr , nr
+30/0.2
+newCorr=zeros(2,3,1,150,150)
+for cc in 1:2
+    for m in 1:1
+        for ri in 1:51
+            for rj in 1:51
+                newCorr[1,1,m,ri,rj]=real(twpt[m][cc][ri][rj])
+            end
+        end
+    end
+end
+
+heatmap(newCorr[1,1,1,:,:])
+
+size(twpt)
+size(twpt[1])
+size(twpt[1][1])
+size(twpt[1][1][1])
+twpt[1][1][1][1]
 
 using MonteCarloGlauber
 using BenchmarkTools
 
 bg2=MonteCarloGlauber.generate_bg(energy2,1,Lead(),Lead(),w,k,p,s_NN,[10,20,30,40];minBiasEvents=5000,r_grid=0:0.1:10)
 
-plot(bg2[1])
+plot(bg[1])
 plot!(bg2[2])
 plot!(bg2[3])
 plot!(bg2[4])

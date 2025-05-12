@@ -270,8 +270,11 @@ function generate_2ptfct(norm,batches, CoM,mList;r_grid=0:1:10,step=2pi/50)
 end
 
 
-function generate_bg_two_pt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins,mList;minBiasEvents=1000000,r_grid=0:1:10,step=2pi/20,Threaded=true)
+function generate_bg_two_pt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins,mList;minBiasEvents=1000000,r_grid=0:1:10,step=2pi/20,Threaded=true,n_ext_Grid=0,nFields=10)
     #batches, CoM=batched_events(Projectile1,Projectile2,w,k,p,sqrtS,bins;minBiasEvents=minBiasEvents)
+    if (length(bins)+1)*100>minBiasEvents
+       error("Not enough events for number of bins, increase minBiasEvents")
+    end
     participants=Participants(Projectile1,Projectile2,w,sqrtS,k,p)
     #if threaded
         events=rand(threaded(participants),minBiasEvents)
@@ -281,10 +284,21 @@ function generate_bg_two_pt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,
     batches, CoM=centralities_selection_CoM(events,bins;Threaded=Threaded)
     bg=generate_background(f,norm,batches,CoM,r_grid=r_grid,step=step)
     twoPtFct_entropy=generate_2ptfct(norm,batches, CoM,mList;r_grid=r_grid,step=step)
-    @show  size(twoPtFct_entropy[1][1][1]),size(twoPtFct_entropy[1]),size(twoPtFct_entropy[1]),size(twoPtFct_entropy)
+    #@show  size(twoPtFct_entropy[1][1][1]),size(twoPtFct_entropy[1]),size(twoPtFct_entropy[1]),size(twoPtFct_entropy)
     twoPtFct=map(m->map(cc->map(r1->map(r2->twoPtFct_entropy[m][cc][r1,r2]*delta_factor(bg[cc][r1])*delta_factor(bg[cc][r2]),1:length(r_grid)),1:length(r_grid)),1:length(bg)),1:length(mList))
     #twoPtFct=map(m->map(cc->map(r1->map(r2->twoPtFct_entropy[m][cc][r1][r2],1:length(r_grid)),1:length(r_grid)),1:length(bg)),1:length(mList))
-    return bg,twoPtFct
+    nGrid=max(length(r_grid),n_ext_Grid)
+    finalCorr=zeros(2,nFields,length(mList),nGrid,nGrid)
+    for cc in 1:length(bg)
+        for m in 1:length(mList)
+            for r1 in 1:length(r_grid)
+                for r2 in 1:length(r_grid)
+                    finalCorr[1,1,m,r1,r2]=real(twoPtFct[m][cc][r1][r2])
+                end
+            end
+        end
+    end
+    return bg,finalCorr
 end
 
 function generate_bg(f,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins;minBiasEvents=1000000,r_grid=0:1:10,step=2pi/10,Threaded=true)
