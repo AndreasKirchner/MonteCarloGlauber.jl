@@ -290,12 +290,12 @@ function generate_bg_two_pt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,
     twoPtFct=map(m->map(cc->map(r1->map(r2->twoPtFct_entropy[m][cc][r1,r2]*delta_factor(bg[cc][r1])*delta_factor(bg[cc][r2]),1:length(r_grid)),1:length(r_grid)),1:length(bg)),1:length(mList))
     #twoPtFct=map(m->map(cc->map(r1->map(r2->twoPtFct_entropy[m][cc][r1][r2],1:length(r_grid)),1:length(r_grid)),1:length(bg)),1:length(mList))
     nGrid=max(length(r_grid),n_ext_Grid)
-    finalCorr=zeros(2,nFields,length(mList),nGrid,nGrid)
+    finalCorr=zeros(2,nFields,nFields,length(mList),nGrid,nGrid)
     for cc in 1:length(bg)
         for m in 1:length(mList)
             for r1 in 1:length(r_grid)
                 for r2 in 1:length(r_grid)
-                    finalCorr[1,1,m,r1,r2]=real(twoPtFct[m][cc][r1][r2])
+                    finalCorr[1,1,1,m,r1,r2]=real(twoPtFct[m][cc][r1][r2])
                 end
             end
         end
