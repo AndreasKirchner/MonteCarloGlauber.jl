@@ -88,5 +88,5 @@ plot!(0:1:10,bg[2])
 ```
 and the two point function
 ```julia
-heatmap(twpt[1,1,1,:,:])
+heatmap(twpt[1,1,1,1,1,:,:])
 ```

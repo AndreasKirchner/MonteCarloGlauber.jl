@@ -66,6 +66,10 @@ Plots.histogram(b_event,nbins=100)
 Plots.histogram(ncoll_event,nbins=100,normalize=true,yaxis=:log)
 energy2(T)=T
 bg,twpt=MonteCarloGlauber.generate_bg_two_pt_fct(energy2,energy2,1,Lead(),Lead(),w,k,p,s_NN,[10,20],[2];minBiasEvents=5000,r_grid=0:0.2:10)
+
+size(twpt)
+heatmap(twpt[1,1,1,1,1,:,:])
+
 using MonteCarloGlauber
 bg2,twpt2=MonteCarloGlauber.generate_bg_two_pt_fct(energy2,energy2,1,Lead(),Lead(),w,k,p,s_NN,[10,20],[2];minBiasEvents=100,r_grid=0:1:10,nFields=3,n_ext_Grid=100)
 heatmap(twpt2[1,1,1,:,:])
