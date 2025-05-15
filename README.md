@@ -90,3 +90,8 @@ and the two point function
 ```julia
 heatmap(twpt[1,1,1,1,1,:,:])
 ```
+The usage of light ions is also possible with the only needed modification in the projectile definition
+```julia
+n1=TabulatedEvent("NLEFT_dmin_0.5fm_negativeweights_Ne.h5")
+```
+with TabulatedEvent being the file of possible neon configurations in this case.
