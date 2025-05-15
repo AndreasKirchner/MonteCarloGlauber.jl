@@ -693,3 +693,42 @@ plot(0:1:10,bg[1])
 plot!(0:1:10,bg[2])
 
 heatmap(twpt[1,1,1,:,:])
+
+using HDF5
+
+test=h5open("src/NLEFT_dmin_0.5fm_negativeweights_Ne.h5","r")
+configs=test["configs"]
+size(configs)
+close(test)
+size(configs)
+
+size(configs)
+
+a=configs[:,:,10]
+
+using MonteCarloGlauber
+aa=TabulatedEvent("NLEFT_dmin_0.5fm_negativeweights_Ne.h5")
+aa.array
+pp=Participants(aa,aa,1,1,6,1,0)
+event=rand(pp,10)
+profile=map(event)   do x 
+    map(Iterators.product(-10:0.5:10,-10:0.5:10)) do y
+        x(y...)
+    end
+end
+heatmap(-10:0.5:10,-10:0.5:10,profile[1])
+
+ab=Participants(Lead(),Lead(),1,1,6,1,0)
+rand(ab,10)
+
+rand(Lead(),10)
+MonteCarloGlauber.drawIndeces(1,aa)
+rand(pp,10)
+
+using Rotations
+rot=rand(RotMatrix{3})
+ww=aa.array[:,:,1]
+
+rr=rot*ww
+
+rr[2]

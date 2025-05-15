@@ -15,6 +15,7 @@ using QuadGK
 using Interpolations
 using Base.Threads
 using DelimitedFiles
+using HDF5
 
 
 
@@ -26,6 +27,7 @@ include("Nucleos3D_refactor.jl")
 include("participants_distribution_refactor.jl")
 include("Nucleos_definition.jl")
 include("utils.jl")
+include("Tabulated_Event.jl")
 
 
 """
@@ -72,7 +74,7 @@ bg, finalCorr = generate_bg_two_pt_fct(
 function generate_bg_two_pt_fct
 end
 
-export NucleiWoodSaxon3D,IntegratedWoodSaxonInterp,IntegratedWoodSaxon, Participants, Participant, threaded, Threaded, rand 
+export NucleiWoodSaxon3D,IntegratedWoodSaxonInterp,IntegratedWoodSaxon, Participants, Participant, threaded, Threaded, rand, TabulatedEvent
 export impactParameter ,multiplicity,center_of_mass,centralities_selection
 
 export InverseFunction
