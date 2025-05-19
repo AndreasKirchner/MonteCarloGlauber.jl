@@ -1,13 +1,14 @@
 using MonteCarloGlauber
 using Test
+using Random
 
 @testset "MonteCarloGlauber.jl" begin
     aa=NucleiWoodSaxon3D(10, 1.5, 5., 1., 0., 0., 0., 0., 0.)
     bb=IntegratedWoodSaxon(10,1,5.,1.,0.)
     cc=IntegratedWoodSaxonInterp(10,1,5.,1.,0.)
-    dd=threarded(aa)
-    ee=Threarded(aa,Threads.nthreads())
-    ff=Threarded(aa,10*Threads.nthreads())  
+    dd=threaded(aa)
+    ee=Threaded(aa,Threads.nthreads())
+    ff=Threaded(aa,10*Threads.nthreads())  
     
     @test size(aa) == (10,2)
     @test eltype(aa) == Float64

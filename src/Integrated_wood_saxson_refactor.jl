@@ -98,7 +98,7 @@ struct Threaded{T,N} <: Sampleable{ArrayLikeVariate{N},Continuous}
     dim::Int64  
 end
 
-Base.size(s::Threaded{T,N}) where {T,N} = (s.nucleon,s.dim)
+Base.size(s::Threaded{T,N}) where {T,N} = (s.copy_buff[1].N_nucleon,s.dim)
 Base.eltype(s::Threaded{T,N}) where {T,N} = eltype(first(s.copy_buff))
 
 

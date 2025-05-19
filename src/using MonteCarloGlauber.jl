@@ -19,10 +19,8 @@ k=1
 p=0.0
 
 rand(threaded(n1),100)
-participants=Participants(n1,n2,2,s_NN,k,p)
-
-heatmap(event[1])
-
+participants=Participants(n1,n2,w,s_NN,k,p)
+ 
 participants=Participants(n1,n2,w,s_NN,k,p)
 event=rand(participants,10)
 profile=map(event)   do x 
@@ -732,3 +730,31 @@ ww=aa.array[:,:,1]
 rr=rot*ww
 
 rr[2]
+using MonteCarloGlauber
+ aa=NucleiWoodSaxon3D(10, 1.5, 5., 1., 0., 0., 0., 0., 0.)
+    bb=IntegratedWoodSaxon(10,1,5.,1.,0.)
+    cc=IntegratedWoodSaxonInterp(10,1,5.,1.,0.)
+    dd=threaded(aa)
+    ee=Threaded(aa,Threads.nthreads())
+    ff=Threaded(aa,10*Threads.nthreads())  
+ 
+ll=Threaded(aa,5)
+ll.N_nucleon
+aa.N_nucleon
+ll.copy_buff[1].N_nucleon
+    
+
+using Test
+ size(aa) == (10,2)
+     eltype(aa) == Float64
+     size(bb) == (10,2)
+     eltype(bb) == Float64
+     size(cc) == (10,2)
+     eltype(cc) == Float64
+     size(dd) == (10,2)    
+
+    @test eltype(dd) == Float64
+    @test size(ee) == (10,2)
+    @test eltype(ee) == Float64
+    @test size(ff) == (10,2)
+    @test eltype(ff) == Float64 

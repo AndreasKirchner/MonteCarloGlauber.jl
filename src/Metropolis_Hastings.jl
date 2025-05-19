@@ -5,7 +5,7 @@ struct WarpedTuple{N,T} <:ValueSupport
 end 
 
 mutable struct Metropolis_Hastings{DIM,T,S,D,M,uType}<:Sampleable{Univariate,WarpedTuple{DIM,uType}}
-    targhet_probability::T
+    target_probability::T
     params::S
     draw_distrubution::D
     burning_time::Int64
@@ -15,13 +15,13 @@ end
 Base.eltype(::Metropolis_Hastings{DIM,T,S,D,M,uType}) where {DIM,T,S,D,M,uType} = NTuple{DIM,uType}
 
 
-function Metropolis_Hastings(rng::AbstractRNG,targhet_probability::T,params::S,draw_distrubution::D,burning_time::Int64) where {T,S,D}
+function Metropolis_Hastings(rng::AbstractRNG,target_probability::T,params::S,draw_distrubution::D,burning_time::Int64) where {T,S,D}
 
     xtype=ntuple(i->rand(rng,draw_distrubution[i]),length(draw_distrubution))
 
-    seed_probability=targhet_probability(xtype...,params...)    
+    seed_probability=target_probability(xtype...,params...)    
     
-    mcmc=Metropolis_Hastings{length(xtype),T,S,D,typeof(seed_probability),eltype(xtype)}(targhet_probability,params,draw_distrubution,burning_time,seed_probability)
+    mcmc=Metropolis_Hastings{length(xtype),T,S,D,typeof(seed_probability),eltype(xtype)}(target_probability,params,draw_distrubution,burning_time,seed_probability)
 
     for i in 1:burning_time
         rand(rng,mcmc)
@@ -30,14 +30,14 @@ function Metropolis_Hastings(rng::AbstractRNG,targhet_probability::T,params::S,d
     return mcmc
 end 
 
-function Metropolis_Hastings(targhet_probability::T,params::S,draw_distrubution::D,burning_time::Int64) where {T,S,D}
-    Metropolis_Hastings(Random.default_rng(),targhet_probability,params,draw_distrubution,burning_time)
+function Metropolis_Hastings(target_probability::T,params::S,draw_distrubution::D,burning_time::Int64) where {T,S,D}
+    Metropolis_Hastings(Random.default_rng(),target_probability,params,draw_distrubution,burning_time)
 end 
  
 
 function Base.copy(s::Metropolis_Hastings{DIM,T,S,D,M,uType}) where {DIM,T,S,D,M,uType}
     
-    Metropolis_Hastings(s.targhet_probability,s.params,s.draw_distrubution,s.burning_time)
+    Metropolis_Hastings(s.target_probability,s.params,s.draw_distrubution,s.burning_time)
 end
 
 function mcmcaccept(rng::AbstractRNG,prob,s::Metropolis_Hastings{DIM,T,S,D,M,uType}) where {DIM,T,S,D,M,uType}
@@ -49,7 +49,7 @@ function mcmcaccept(rng::AbstractRNG,prob,s::Metropolis_Hastings{DIM,T,S,D,M,uTy
         rand(rng,x)
     end
 
-    newprob=s.targhet_probability(x_propose...,s.params...)
+    newprob=s.target_probability(x_propose...,s.params...)
 
     deltaS =newprob/prob
 
@@ -77,7 +77,7 @@ function mcmcaccept_old(rng::AbstractRNG,prob,s::Metropolis_Hastings{DIM,T,S,D,M
         rand(rng,x)
     end
 
-    newprob=s.targhet_probability(x_propose...,s.params...)
+    newprob=s.target_probability(x_propose...,s.params...)
 
     deltaS =newprob/prob
 
