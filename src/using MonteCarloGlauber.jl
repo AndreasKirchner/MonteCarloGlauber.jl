@@ -753,6 +753,21 @@ using Test
      eltype(cc) == Float64
      size(dd) == (10,2)    
 
+     rand(aa,100)
+
+event=Participants(aa,aa,1,1,6.4,1,0)
+
+
+
+typeof(rand(event))
+ab=rand(event,10)
+ab[1].part1
+
+rand(event,100)
+
+    @test rand(event,100) isa Vector{Array{Float64,2}}
+    @test rand(event).part1 isa Vector{SVector{2,Float64}}
+
     @test eltype(dd) == Float64
     @test size(ee) == (10,2)
     @test eltype(ee) == Float64
