@@ -77,8 +77,11 @@ heatmap(-10:0.5:10,-10:0.5:10,profile[1])
 ```
 It is also possible to generate the background configuration and two point correlation function used in the FluiduM code via
 ```julia
-energy2(T)=T
-bg,twpt=generate_bg_two_pt_fct(energy2,energy2,1,Lead(),Lead(),w,k,p,s_NN,[10,20],[2];minBiasEvents=1000,r_grid=0:1:10,nFields=3,n_ext_Grid=20)
+fmGeV=5 # conversion factor for units
+entropy(T)=47.5*T^3*pi^2/90/4*fmGeV^3 #entropy as function of temperature
+entropyToTemp(T)=InverseFunction(energy)(T) #inverse, i.e. T(s)
+id(T)=T #function to convert perturbations as function of bg temp, i.e. dT/ds(T_0)
+bg,twpt=generate_bg_two_pt_fct(energy,id,1,Lead(),Lead(),w,k,p,s_NN,[10,20],[2];minBiasEvents=1000,r_grid=0:1:10,nFields=3,n_ext_Grid=20)
 
 ```
 We can also plot the background

@@ -18,6 +18,25 @@ s_NN=2760
 k=1
 p=0.0
 
+
+
+e(T)=T^3pi
+e(2)
+
+energy2(0.6)
+
+fmGeV=5
+energy2(T)=47.5*T^3*pi^2/90/4*fmGeV^3 #substitute entropy of the ideal gas of quarks (u,d,s) and gluons 
+entropyToEnergy(T)=InverseFunction(energy2)(T)
+norm=40
+bg=MonteCarloGlauber.generate_bg(entropyToEnergy,norm,Lead(),Lead(),w,k,p,s_NN,[5];minBiasEvents=1000,r_grid=0:0.1:10)
+
+plot(bg[1])
+
+entropyToEnergy(1)
+
+energy2(0.1)
+
 rand(threaded(n1),100)
 participants=Participants(n1,n2,w,s_NN,k,p)
  
