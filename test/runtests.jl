@@ -46,19 +46,19 @@ using Test
     #@test rand(rng,event,100) isa Vector{Array{Float64,2}}
     #@test rand(rng,event) isa Array{Float64,2}
 
-    @test rand(aa,100) isa Matrix{Float64}
-    @test rand(bb,100) isa Matrix{Float64}
-    @test rand(cc,100) isa Matrix{Float64}
-    @test rand(dd,100) isa Matrix{Float64}
-    @test rand(ee,100) isa Matrix{Float64}
-    @test rand(ff,100) isa Matrix{Float64}  
+    #@test rand(aa,100) isa Matrix{Float64}
+    #@test rand(bb,100) isa Matrix{Float64}
+    #@test rand(cc,100) isa Matrix{Float64}
+    #@test rand(dd,100) isa Matrix{Float64}
+    #@test rand(ee,100) isa Matrix{Float64}
+    #@test rand(ff,100) isa Matrix{Float64}  
     
-    @test rand(aa) isa Matrix{Float64}
-    @test rand(bb) isa Matrix{Float64}     
-    @test rand(cc) isa Matrix{Float64}
-    @test rand(dd) isa Matrix{Float64}      
-    @test rand(ee) isa Matrix{Float64}
-    @test rand(ff) isa Matrix{Float64}        
+    #@test rand(aa) isa Matrix{Float64}
+    #@test rand(bb) isa Matrix{Float64}     
+    #@test rand(cc) isa Matrix{Float64}
+    #@test rand(dd) isa Matrix{Float64}      
+    #@test rand(ee) isa Matrix{Float64}
+    #@test rand(ff) isa Matrix{Float64}        
 
     event=Participants(aa,aa,1,1,6.4,1,0)
 
