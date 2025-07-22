@@ -209,6 +209,7 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
     R1=nucleos.nucl1.R
     R2=nucleos.nucl2.R 
     n1=rand(rng,nucleos.nucl1)
+    @show n1
     n2=rand(rng,nucleos.nucl2)
     θ_b=rand(rng,nucleos.inpact_parameter_angle)
     s_th,c_th=sincos(θ_b)
@@ -225,7 +226,8 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
         x_1=pos1rotshift[1]
         y_1=pos1rotshift[2]
         @inbounds for nucl2 in axes(n2,1)    
-            pos2=SVector{2}(n1[nucl2,1],n2[nucl2,2])   
+            pos2=SVector{2}(n1[nucl2,1],n2[nucl2,2])  
+           # @show pos2 
             pos2rotshift= pos2 +b_vec
             x_2=pos2rotshift[1]
             y_2=pos2rotshift[2]

@@ -19,6 +19,13 @@ k=1
 p=0.0
 
 
+n1=TabulatedEvent("src/NLEFT_dmin_0.5fm_negativeweights_Ne.h5")
+using HDF5
+
+open("src/NLEFT_dmin_0.5fm_negativeweights_Ne.h5","r")
+
+
+participants=Participants(n1,n1,w,s_NN,k,p)
 
 e(T)=T^3pi
 e(2)
@@ -29,7 +36,7 @@ fmGeV=5
 energy2(T)=47.5*T^3*pi^2/90/4*fmGeV^3 #substitute entropy of the ideal gas of quarks (u,d,s) and gluons 
 entropyToEnergy(T)=InverseFunction(energy2)(T)
 norm=40
-bg=MonteCarloGlauber.generate_bg(entropyToEnergy,norm,Lead(),Lead(),w,k,p,s_NN,[5];minBiasEvents=1000,r_grid=0:0.1:10)
+bg=MonteCarloGlauber.generate_bg(entropyToEnergy,norm,n1,n1,w,k,p,s_NN,[5];minBiasEvents=100,r_grid=0:0.1:10)
 
 plot(bg[1])
 
@@ -39,16 +46,55 @@ energy2(0.1)
 
 rand(threaded(n1),100)
 participants=Participants(n1,n2,w,s_NN,k,p)
- 
-participants=Participants(n1,n2,w,s_NN,k,p)
-event=rand(participants,10)
-profile=map(event)   do x 
-    map(Iterators.product(-10:0.1:10,-10:0.1:10)) do y
+threaded(Participants(n1,n1,w,s_NN,k,p)) 
+
+
+participants=Participants(n2,n2,w,s_NN,k,p)
+
+participantsN=Participants(n1,n1,w,s_NN,k,p)
+
+participantsN
+participants
+
+participants.nucl1
+participantsN.nucl1
+
+eve1=rand(threaded(participants),5)
+eve2=rand(threaded(participantsN),5)
+
+
+
+
+rand(participants.nucl1)
+eve1.n_coll
+eve2.n_coll
+
+eve1.part1
+eve1.part2
+eve2.part1
+
+
+event=rand(participantsN,2)
+
+event[1].n_coll
+event[2].n_coll
+
+event[1].part1
+event[2].part2
+
+
+profile=map(eve1)   do x 
+    map(Iterators.product(-8:0.1:8,-8:0.1:8)) do y
         x(y...)
     end
 end
-heatmap(-10:0.1:10,-10:0.1:10,profile[1])
-heatmap(-10:0.1:10,-10:0.1:10,profile[2])
+
+heatmap(-8:0.1:8,-8:0.1:8,profile[1])
+heatmap(-8:0.1:8,-8:0.1:8,profile[2])
+
+threaded
+
+heatmap(-10:0.1:10,-10:0.1:10,profile[6])
 heatmap(-10:0.1:10,-10:0.1:10,profile[3])
 heatmap(-10:0.1:10,-10:0.1:10,profile[4])
 
