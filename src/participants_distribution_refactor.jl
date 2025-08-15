@@ -209,7 +209,6 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
     R1=nucleos.nucl1.R
     R2=nucleos.nucl2.R 
     n1=rand(rng,nucleos.nucl1)
-    @show n1
     n2=rand(rng,nucleos.nucl2)
     θ_b=rand(rng,nucleos.inpact_parameter_angle)
     s_th,c_th=sincos(θ_b)
