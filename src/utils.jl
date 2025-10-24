@@ -130,7 +130,7 @@ function centralities_selection(events::Vector{T} ;threaded=true) where {T<:Part
     return centrality_borders
 end
 
-function construct_trento_names(part;extensionString="dat",mMode="2")
+function construct_trento_names(part;extensionString="dat",mMode="2",cc="0-100",path="./")
     proj1=projectile_dictionary(part.nucl1.N_nucleon)
     proj2=projectile_dictionary(part.nucl2.N_nucleon)
     w=convert_float_to_string(string(part.sub_nucleon_width))
@@ -138,10 +138,12 @@ function construct_trento_names(part;extensionString="dat",mMode="2")
     p=convert_float_to_string(string(part.p))
     k=convert_float_to_string(string(part.shape_parameter))
     m=string(mMode)
-    bgString="trento_BG_"*proj1*"_"*proj2*"_w_"*w*"_sNN_"*sigma_NN*"_p_"*p*"_k_"*k*"."*extensionString
-    twoptString="trento_two_pt_fct_m_"*m*"_"*proj1*"_"*proj2*"_w_"*w*"_sNN_"*sigma_NN*"_p_"*p*"_k_"*k*"."*extensionString
+    bin=string(cc)
+    bgString=path*"trento_BG_"*proj1*"_"*proj2*"_w_"*w*"_sNN_"*sigma_NN*"_p_"*p*"_k_"*k*"_cc_"*bin*"."*extensionString
+    twoptString=path*"trento_two_pt_fct_m_"*m*"_"*proj1*"_"*proj2*"_w_"*w*"_sNN_"*sigma_NN*"_p_"*p*"_k_"*k*"_cc_"*bin*"."*extensionString
     return bgString,twoptString
 end
+
 
 function convert_float_to_string(f)
     return replace(string(f), "." => "_")
@@ -149,8 +151,8 @@ end
 
 substring(str, start, stop) = str[nextind(str, 0, start):nextind(str, 0, stop)]
 
-function check_for_config(part;extensionString="dat",mMode="2",path="")
-    bgString,twoptString=construct_trento_names(part;extensionString=extensionString,mMode=mMode)
+function check_for_config(part;extensionString="dat",mMode="2",path="./",cc="0-100")
+    bgString,twoptString=construct_trento_names(part;extensionString=extensionString,mMode=mMode,cc=cc)
     bgString=path*bgString
     twoptString=path*twoptString
     return isfile(bgString), isfile(twoptString)
@@ -232,6 +234,12 @@ function generate_background(f,norm,batches,CoM;r_grid=0:1:10,step=2pi/10)
     return map(x->f.(-norm .*x[:,1]),finalRes)
 end
 
+function generate_background(f,norm,batches,CoM,cc;r_grid=0:1:10,step=2pi/10)
+    #batches, CoM=batched_events(Projectile1,Projectile2,w,k,p,sqrtS,bins;minBiasEvents=minBiasEvents)
+    finalRes=DifferentiationInterface.gradient(x->log(generatingfunction(batches[cc],x,r_grid,step,CoM[cc])), AutoForwardDiff(), zeros(length(r_grid),2))
+    return f.(-norm .*finalRes[:,1])
+end
+
 struct InverseFunction{N,F}
     fun::F
 end 
@@ -269,8 +277,13 @@ function generate_2ptfct(norm,batches, CoM,mList;r_grid=0:1:10,step=2pi/50)
     return twoPtFct
 end
 
-
-
+function generate_2ptfct(norm,batches,CoM,m::Int,cc::Int;r_grid=0:1:10,step=2pi/50)
+    finalRes=DifferentiationInterface.hessian(x->log(generatingfunction_h(batches[cc],x,r_grid,step,CoM[cc],m,norm)), AutoForwardDiff(), zeros(length(r_grid),2))
+    hessianTransform=reshape(finalRes,(length(r_grid),2,length(r_grid),2))
+    rIndeces=Iterators.product(1:length(r_grid),1:length(r_grid))
+    twoPtFct=map(rr->FT(hessianTransform[rr[1],:,rr[2],:]),rIndeces)
+    return twoPtFct
+end
 
 function generate_bg_two_pt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins,mList;minBiasEvents=1000000,r_grid=0:1:10,step=2pi/20,Threaded=true,n_ext_Grid=0,nFields=10)
     #batches, CoM=batched_events(Projectile1,Projectile2,w,k,p,sqrtS,bins;minBiasEvents=minBiasEvents)
@@ -303,11 +316,13 @@ function generate_bg_two_pt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,
     return bg,finalCorr
 end
 
+
+
 function generate_bg(f,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins;minBiasEvents=1000000,r_grid=0:1:10,step=2pi/10,Threaded=true)
     #batches, CoM=batched_events(Projectile1,Projectile2,w,k,p,sqrtS,bins;minBiasEvents=minBiasEvents)
     participants=Participants(Projectile1,Projectile2,w,sqrtS,k,p)
     #if threaded
-        events=rand(threaded(participants),minBiasEvents)
+     events=rand(threaded(participants),minBiasEvents)
     #else
     #    events=rand(participants,minBiasEvents)
     #end
@@ -315,7 +330,6 @@ function generate_bg(f,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins;minBiasEven
     bg=generate_background(f,norm,batches,CoM,r_grid=r_grid,step=step)
     return bg
 end
-
 
 function save_bg_two_pt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins,mList;minBiasEvents=1000000,r_grid=0:1:10,step=2pi/20,Threaded=true)
     participants=Participants(Projectile1,Projectile2,w,sqrtS,k,p)
@@ -335,4 +349,74 @@ function save_bg_two_pt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sq
         writedlm(twoptString,real.(twoPtFct[i]))
     end
 
+end
+
+
+function generate_bg_two_pt_fct_save(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins,mList;minBiasEvents=1000,r_grid=0:1:10,step=2pi/20,Threaded=true,n_ext_Grid=0,nFields=10,
+    extensionString="dat",path="./",override_files=false)
+   
+    if (length(bins)+1)*100>minBiasEvents
+       error("Not enough events for number of bins, increase minBiasEvents")
+    end
+    participants=Participants(Projectile1,Projectile2,w,sqrtS,k,p)
+    nGrid=max(length(r_grid),n_ext_Grid)
+    finalCorr=zeros(length(bins),2,nFields,nFields,length(mList),nGrid,nGrid)
+    bg=zeros(length(bins),nGrid)    
+    
+    evt_gen_counter = 0 
+
+    for cc in eachindex(bins)
+        if cc==1
+            lb = 0
+            rb = bins[cc]
+        else
+            lb = bins[cc-1]
+            rb = bins[cc]
+        end
+        bg_file = check_for_config(participants;extensionString=extensionString,path=path,cc=string(lb) * "-" * string(rb))[1]
+        bgString=construct_trento_names(participants;extensionString=extensionString,cc=string(lb) * "-" * string(rb),path=path)[1]   
+        if bg_file ==true && override_files==false
+            bg[cc,:]=collect(readdlm(bgString))
+        elseif (bg_file == false || override_files==true) && evt_gen_counter == 0
+            evt_gen_counter += 1    
+            events=rand(threaded(participants),minBiasEvents)
+            batches, CoM=centralities_selection_CoM(events,bins;Threaded=Threaded)
+        end
+        for i in eachindex(mList)
+            bg_file, twpt_file = check_for_config(participants;extensionString=extensionString,mMode=mList[i],path=path,cc=string(lb) * "-" * string(rb))
+            bgString,twoptString=construct_trento_names(participants;extensionString=extensionString,mMode=mList[i],cc=string(lb) * "-" * string(rb),path=path)  
+            if twpt_file == true && override_files==false
+                finalCorr[cc,1,1,1,i,:,:]=collect(readdlm(twoptString))
+            elseif (twpt_file == false || override_files==true) && evt_gen_counter == 0
+                evt_gen_counter += 1    
+                events=rand(threaded(participants),minBiasEvents)
+                batches, CoM=centralities_selection_CoM(events,bins;Threaded=Threaded)
+            end
+        end
+
+            
+        if bg_file == false || override_files==true
+            bg_small_grid=generate_background(f,norm,batches,CoM,cc,r_grid=r_grid,step=step)
+            for r1 in 1:length(r_grid)
+                bg[cc,r1]=bg_small_grid[r1]
+            end
+            writedlm(bgString,bg)
+        end
+               
+        for i in eachindex(mList)
+            bg_file, twpt_file = check_for_config(participants;extensionString=extensionString,mMode=mList[i],path=path,cc=string(lb) * "-" * string(rb))
+            bgString,twoptString=construct_trento_names(participants;extensionString=extensionString,mMode=mList[i],cc=string(lb) * "-" * string(rb),path=path)   
+            if twpt_file == false || override_files==true
+                twoPtFct_entropy=generate_2ptfct(norm,batches,CoM,mList[i],cc;r_grid=r_grid,step=step)
+                twoPtFct=map(r1->map(r2->twoPtFct_entropy[r1,r2]*delta_factor(bg[r1])*delta_factor(bg[r2]),1:length(r_grid)),1:length(r_grid))
+                for r1 in 1:length(r_grid)
+                    for r2 in 1:length(r_grid)
+                        finalCorr[cc,1,1,1,i,r1,r2]=real(twoPtFct[r1][r2])
+                    end
+                end
+                writedlm(twoptString,finalCorr[cc,1,1,1,i,:,:])
+            end
+        end
+    end  
+    return bg,finalCorr;
 end
