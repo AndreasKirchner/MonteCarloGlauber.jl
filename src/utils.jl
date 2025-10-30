@@ -353,7 +353,7 @@ end
 
 
 function generate_bg_two_pt_fct_save(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins,mList;minBiasEvents=1000,r_grid=0:1:10,step=2pi/20,Threaded=true,n_ext_Grid=0,nFields=10,
-    extensionString="dat",path="./",override_files=false)
+    extensionString="dat",path="./",override_files=false,selected_bins=nothing)
    
     if (length(bins)+1)*100>minBiasEvents
        error("Not enough events for number of bins, increase minBiasEvents")
@@ -365,7 +365,14 @@ function generate_bg_two_pt_fct_save(f,delta_factor,norm,Projectile1,Projectile2
     
     evt_gen_counter = 0 
 
-    for cc in eachindex(bins)
+    # Determine which bins to process
+    bin_indices = eachindex(bins)
+    if selected_bins !== nothing
+        # selected_bins can be a single value or a vector of bin ranges, e.g. [2] or [2,3]
+        bin_indices = selected_bins
+    end
+
+    for cc in bin_indices
         if cc==1
             lb = 0
             rb = bins[cc]
@@ -419,4 +426,15 @@ function generate_bg_two_pt_fct_save(f,delta_factor,norm,Projectile1,Projectile2
         end
     end  
     return bg,finalCorr;
+end
+
+function change_norm(bg,finalCorr,new_norm,old_norm,eos)
+    rescaling_factor=new_norm/old_norm
+    entropy(T)=pressure_derivative(T,Val(1),eos) #entropy as function of temperature
+    entropyToTemp(T)=InverseFunction(entropy)(T) #inverse, i.e. T(s)
+    dSdT(T)=pressure_derivative(T,Val(2),eos) #function to convert perturbations as function of bg temp, i.e. dT/ds(T_0)
+    dSdTinverse(T) = 1/dSdT(T)
+    rescaled_bg=entropyToTemp.(entropy.(bg) .* rescaling_factor)
+    rescaled_finalCorr=finalCorr .* (rescaling_factor^2)
+    return rescaled_bg, rescaled_finalCorr
 end
