@@ -352,7 +352,75 @@ function save_bg_two_pt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sq
 end
 
 
-function generate_bg_two_pt_fct_save(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins,mList;minBiasEvents=1000,r_grid=0:1:10,step=2pi/20,Threaded=true,n_ext_Grid=0,nFields=10,
+function generate_bg_two_pt_fct_save(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins,mList;minBiasEvents = 1000,r_grid = 0:1:10,step = 2pi/20,Threaded = true,n_ext_Grid = 0,nFields = 10,extensionString = "dat",path = "./",override_files = false)
+
+    # Basic validation
+    if (length(bins) + 1) * 100 > minBiasEvents
+        error("Not enough events for number of bins, increase minBiasEvents")
+    end
+
+    # Initialize participant system and data containers
+    participants = Participants(Projectile1, Projectile2, w, sqrtS, k, p)
+    nGrid = max(length(r_grid), n_ext_Grid)
+    finalCorr = zeros(length(bins), 2, nFields, nFields, length(mList), nGrid, nGrid)
+    bg = zeros(length(bins), nGrid)
+
+    # Loop over all bins (no selected_bins)
+    for cc in eachindex(bins)
+        # Define lower and upper bin edges
+        lb = cc == 1 ? 0 : bins[cc - 1]
+        rb = bins[cc]
+
+        # Construct background filename
+        bgString = construct_trento_names(participants;extensionString = extensionString,cc = string(lb) * "-" * string(rb),path = path)[1]
+
+        if override_files == false
+            # =====================================
+            # READ EXISTING DATA FROM FILES
+            # =====================================
+            bg[cc, :] = collect(readdlm(bgString))
+
+            for i in eachindex(mList)
+                _, twoptString = construct_trento_names(participants;extensionString = extensionString,mMode = mList[i],cc = string(lb) * "-" * string(rb),path = path)
+                finalCorr[cc, 1, 1, 1, i, :, :] = collect(readdlm(twoptString))
+            end
+
+        else
+            # =====================================
+            # GENERATE EVERYTHING FROM SCRATCH
+            # =====================================
+            events = rand(threaded(participants), minBiasEvents)
+            batches, CoM = centralities_selection_CoM(events, bins; Threaded = Threaded)
+
+            # Generate background
+            bg_small_grid = generate_background(f, norm, batches, CoM, cc; r_grid = r_grid, step = step)
+            bg[cc, :] .= bg_small_grid
+            writedlm(bgString, bg[cc, :])
+
+            # Generate two-point correlation functions
+            for i in eachindex(mList)
+                _, twoptString = construct_trento_names(participants;extensionString = extensionString,mMode = mList[i],cc = string(lb) * "-" * string(rb),path = path)
+                twoPtFct_entropy = generate_2ptfct(norm, batches, CoM, mList[i], cc; r_grid = r_grid, step = step)
+
+                # Compute corrected two-point function
+                twoPtFct = [
+                    twoPtFct_entropy[r1, r2] *
+                    delta_factor(bg[cc, r1]) *
+                    delta_factor(bg[cc, r2])
+                    for r1 in eachindex(r_grid), r2 in eachindex(r_grid)
+                ]
+
+                finalCorr[cc, 1, 1, 1, i, :, :] .= real.(twoPtFct)
+                writedlm(twoptString, finalCorr[cc, 1, 1, 1, i, :, :])
+            end
+        end
+    end
+
+    return bg, finalCorr
+end
+
+
+function generate_bg_two_pt_fct_save_wip(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins,mList;minBiasEvents=1000,r_grid=0:1:10,step=2pi/20,Threaded=true,n_ext_Grid=0,nFields=10,
     extensionString="dat",path="./",override_files=false,selected_bins=nothing)
    
     if (length(bins)+1)*100>minBiasEvents
