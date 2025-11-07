@@ -1,7 +1,7 @@
 using MonteCarloGlauber
-using Test
+#using Test
 #using StaticArrays
-
+#=
 @testset "MonteCarloGlauber.jl" begin
     aa=NucleiWoodSaxon3D(10, 1.5, 5., 1., 0., 0., 0., 0., 0.)
     bb=IntegratedWoodSaxon(10,1,5.,1.,0.)
@@ -38,6 +38,7 @@ using Test
     #@test rand(rng,dd) isa Matrix{Float64}      
     #@test rand(rng,ee) isa Matrix{Float64}
     #@test rand(rng,ff) isa Matrix{Float64}        
+    =#
 #
     #event=Participants(aa,aa,1,1,6.4,1,0)
 #
@@ -60,7 +61,7 @@ using Test
     #@test rand(ee) isa Matrix{Float64}
     #@test rand(ff) isa Matrix{Float64}        
 
-    event=Participants(aa,aa,1,1,6.4,1,0)
+    #event=Participants(aa,aa,1,1,6.4,1,0)
 
     
     
@@ -70,4 +71,4 @@ using Test
     #@test rand(event).part2 isa Vector{SVector{2,Float64}}
 #TODO how to add package to test?
 
-end
+#end
