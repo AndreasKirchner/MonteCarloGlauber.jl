@@ -48,8 +48,17 @@ rand(threaded(n1),100)
 participants=Participants(n1,n2,w,s_NN,k,p)
 threaded(Participants(n1,n1,w,s_NN,k,p)) 
 
+#INITIAL CONDITIONS
+n1= Lead()
+n2= Lead()
+w= 1
+s_NN=5000
+k=1
+p=0.
+Norm = 50
 
-participants=Participants(n2,n2,w,s_NN,k,p)
+
+participants=Participants(n2,n1,w,s_NN,k,p,0.0)
 
 participantsN=Participants(n1,n1,w,s_NN,k,p)
 
@@ -58,11 +67,11 @@ participants
 
 participants.nucl1
 participantsN.nucl1
-
+participants=Participants(n2,n1,w,s_NN,k,p,0.0)
 eve1=rand(threaded(participants),5)
 eve2=rand(threaded(participantsN),5)
 
-
+heatmap(eve1[1])
 
 
 rand(participants.nucl1)
@@ -82,15 +91,21 @@ event[2].n_coll
 event[1].part1
 event[2].part2
 
-
+participants=Participants(n2,n1,w,s_NN,k,p,(0.0,1.0))
+eve1=rand(threaded(participants),10)
 profile=map(eve1)   do x 
-    map(Iterators.product(-8:0.1:8,-8:0.1:8)) do y
+    map(Iterators.product(-20:0.2:20,-20:0.2:20)) do y
         x(y...)
     end
 end
 
-heatmap(-8:0.1:8,-8:0.1:8,profile[1])
-heatmap(-8:0.1:8,-8:0.1:8,profile[2])
+heatmap(-20:0.2:20,-20:0.2:20,log.(profile[9]))
+heatmap(-20:0.2:20,-20:0.2:20,profile[1])
+
+com=center_of_mass(eve1[3])
+
+com[2]/com[1]
+com[3]/com[1]
 
 threaded
 
