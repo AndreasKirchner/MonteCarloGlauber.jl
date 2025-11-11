@@ -164,8 +164,8 @@ function projectile_dictionary(massNumber)
     return dict[massNumber]
 end
 
-function split_vector_by_indices(vector, indices)
-    chunks = []
+function split_vector_by_indices_old(vector, indices)
+    chunks = empty(vector,eltype(vector))
     start_idx = 1
     for idx in indices
         push!(chunks, vector[start_idx:idx])
@@ -177,7 +177,23 @@ function split_vector_by_indices(vector, indices)
     return chunks
 end
 
+function split_vector_by_indices(vector, indices)
+    # Combine the start index (1) and all indices+1 as starting points,
+    # and all indices and the end index as ending points.
+    
+    # 1. Prepare all the index ranges.
+    # The start indices are 1 and all indices + 1
+    starts = vcat(1, indices .+ 1)
+    
+    # The end indices are all indices and the end of the vector
+    ends = vcat(indices, length(vector))
 
+    # 2. Use a generator/comprehension to create the chunks.
+    # This automatically infers the concrete type of the resulting vector.
+    chunks = [vector[s:e] for (s, e) in zip(starts, ends) if s <= e]
+    
+    return chunks
+end
 
 function generatingfunction(conf_part::Vector{T},h,r,step,CoMList) where {T<:Participant}
     #sumval=0.0
@@ -227,9 +243,11 @@ end
 
 function generate_background(f,norm,batches,CoM;r_grid=0:1:10,step=2pi/10)
     #batches, CoM=batched_events(Projectile1,Projectile2,w,k,p,sqrtS,bins;minBiasEvents=minBiasEvents)
+   # ex = DifferentiationInterface.gradient(x->log(generatingfunction(batches[1],x,r_grid,step,CoM[1])), AutoForwardDiff(), zeros(eltype(r_grid),length(r_grid),2))
+   # finalRes = zeros(Float64,length(batches)-1, length(r_grid), 2)
     finalRes=tmap(1:length(batches)-1) do i
         #DifferentiationInterface.gradient(x->log(generatingfunction(batches[i],x,r_grid,step,CoM[i],f,norm)), AutoForwardDiff(), zeros(length(r_grid),2))
-        DifferentiationInterface.gradient(x->log(generatingfunction(batches[i],x,r_grid,step,CoM[i])), AutoForwardDiff(), zeros(length(r_grid),2))
+        DifferentiationInterface.gradient(x->log(generatingfunction(batches[i],x,r_grid,step,CoM[i])), AutoForwardDiff(), zeros(eltype(r_grid),length(r_grid),2))
     end
     return map(x->f.(-norm .*x[:,1]),finalRes)
 end
@@ -322,7 +340,7 @@ function generate_bg(f,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins;minBiasEven
     #batches, CoM=batched_events(Projectile1,Projectile2,w,k,p,sqrtS,bins;minBiasEvents=minBiasEvents)
     participants=Participants(Projectile1,Projectile2,w,sqrtS,k,p)
     #if threaded
-     events=rand(threaded(participants),minBiasEvents)
+    events=rand(threaded(participants),minBiasEvents)
     #else
     #    events=rand(participants,minBiasEvents)
     #end

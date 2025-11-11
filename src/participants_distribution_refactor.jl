@@ -118,19 +118,19 @@ function Participants
 
 end 
 
-function Participants(n1,n2,w,s_NN,k,p,b)
+function Participants(n1,n2,w,s_NN,k,p,b::Tuple{T1,T2}) where {T1<:Real,T2<:Real}
 
     sigma_NN=cross_section_from_energy(s_NN)
     f(sigmagg,p)=totalcross_section(w,sigmagg,sigma_NN) 
-    u0 = 1.
+    u0 = one(eltype(f))
     prob = NonlinearProblem(f, u0)
     sol=solve(prob,SimpleNewtonRaphson())
 
     sigg=sol.u
     
-    if length(b) ==1 
-    return Participants(n1,n2,w,TriangularDist(b,b,b),Uniform(0,2pi),sigg,k,sigma_NN,p)
-    end 
+#    if length(b) ==1 
+#    return Participants(n1,n2,w,TriangularDist(b,b,b),Uniform(0,2pi),sigg,k,sigma_NN,p)
+#    end 
 
     return Participants(n1,n2,w,truncated(TriangularDist(0,b[2],b[2]),b[1],b[2]),Uniform(0,2pi),sigg,k,sigma_NN,p)
     #Participants(n1,n2,w,truncated(TriangularDist(0,b[2],b[2]),b[1],b[2]),Uniform(0,2pi),sigg,k,Float64(sigma_NN),p)
@@ -162,19 +162,19 @@ function Base.copy(s::Participants{A,B,C,D,E,F,G,L}) where {A,B,C,D,E,F,G,L}
 
 
     b=unique(Distributions.params(s.inpact_parameter_magitude))
-
+#=
 if length(b)==1
     
     return Participants(copy(s.nucl1),copy(s.nucl2),s.sub_nucleon_width,TriangularDist(first(b),first(b),first(b)),Uniform(0,2pi),s.sigma_gg,s.shape_parameter,s.total_cross_section,s.p)
 
 end
-
-if length(b)==2
+=#
+#if length(b)==2
 
     return Participants(copy(s.nucl1),copy(s.nucl2),s.sub_nucleon_width,
     truncated(TriangularDist(0,b[2],b[2]),b[1],b[2]),Uniform(0,2pi),s.sigma_gg,s.shape_parameter,s.total_cross_section,s.p)
 
-end
+#end
 
 end 
 
