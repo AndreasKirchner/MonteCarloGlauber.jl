@@ -23,7 +23,7 @@ function center_of_mass(con::T;Nr=100, Nth=50) where {T<:Participant}
         s,c=sincos(θ) 
         x=r*c
         y=r*s
-        SVector{3}(1,x,y) .*con(x,y)*r*δr*δθ
+        SVector{3}(1.,x,y) .*con(x,y)*r*δr*δθ
     end 
 end
 
@@ -73,16 +73,17 @@ Selects centralities from a vector of events.
 
 # Example
 """
-function centralities_selection_CoM(events::Vector{T},bins ;Threaded=true) where {T<:Participant}
+function centralities_selection_CoM(events::Vector{T},bins; Threaded=true ) where {T<:Participant}
     
     if Threaded 
         multi=tmap(events)   do x 
-            center_of_mass(x)
-        end
+           center_of_mass(x)
+       end
         mult=tmap(m->m[1],multi)
         #com1=tmap(m->m[2],multi)
         #com2=tmap(m->m[3],multi)
     else 
+
         multi=map(events)   do x 
             center_of_mass(x)
         end
@@ -92,7 +93,7 @@ function centralities_selection_CoM(events::Vector{T},bins ;Threaded=true) where
     end 
 
     event_perm=sortperm(mult,rev=true)
-    multiplicity_sorted=mult[event_perm]
+   # multiplicity_sorted=mult[event_perm]
     CoM_sorted=multi[event_perm]
     events_sorted=events[event_perm]
 
@@ -101,9 +102,12 @@ function centralities_selection_CoM(events::Vector{T},bins ;Threaded=true) where
     n_event_per_bin=Int(min_bias ÷ 100)
     realBinVals=n_event_per_bin*bins
 
-    centrality_borders=map(x->x[1],multiplicity_sorted[1:n_event_per_bin:min_bias])
+    #centrality_borders=map(x->x[1],multiplicity_sorted[1:n_event_per_bin:min_bias])
 
-    return split_vector_by_indices(events_sorted,realBinVals), split_vector_by_indices(CoM_sorted,realBinVals)
+    #return split_vector_by_indices(events_sorted,realBinVals), split_vector_by_indices(CoM_sorted,realBinVals)
+    batches= split_vector_by_indices(events_sorted,realBinVals)
+    CoM= split_vector_by_indices(CoM_sorted,realBinVals)
+    return batches, CoM
 
     #return centrality_borders
 end
@@ -241,13 +245,15 @@ end
 
 
 
-function generate_background(f,norm,batches,CoM;r_grid=0:1:10,step=2pi/10)
+function generate_background(f,norm,batches,CoM;r_grid=0.:1.:10.,step=2pi/10)
     #batches, CoM=batched_events(Projectile1,Projectile2,w,k,p,sqrtS,bins;minBiasEvents=minBiasEvents)
    # ex = DifferentiationInterface.gradient(x->log(generatingfunction(batches[1],x,r_grid,step,CoM[1])), AutoForwardDiff(), zeros(eltype(r_grid),length(r_grid),2))
    # finalRes = zeros(Float64,length(batches)-1, length(r_grid), 2)
-    finalRes=tmap(1:length(batches)-1) do i
+    finalRes=map(1:length(batches)-1) do i
+        grad=zeros(eltype(r_grid),length(r_grid))
         #DifferentiationInterface.gradient(x->log(generatingfunction(batches[i],x,r_grid,step,CoM[i],f,norm)), AutoForwardDiff(), zeros(length(r_grid),2))
-        DifferentiationInterface.gradient(x->log(generatingfunction(batches[i],x,r_grid,step,CoM[i])), AutoForwardDiff(), zeros(eltype(r_grid),length(r_grid),2))
+        DifferentiationInterface.gradient!(x->log(generatingfunction(batches[i],x,r_grid,step,CoM[i])),grad, AutoForwardDiff(), zeros(eltype(r_grid),length(r_grid),2))
+        return grad
     end
     return map(x->f.(-norm .*x[:,1]),finalRes)
 end

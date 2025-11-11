@@ -122,11 +122,13 @@ function Participants(n1,n2,w,s_NN,k,p,b::Tuple{T1,T2}) where {T1<:Real,T2<:Real
 
     sigma_NN=cross_section_from_energy(s_NN)
     f(sigmagg,p)=totalcross_section(w,sigmagg,sigma_NN) 
-    u0 = one(eltype(f))
-    prob = NonlinearProblem(f, u0)
+    u0 =one(sigma_NN) #one(eltype(f))
+    prob = NonlinearProblem{false}(f, u0)
     sol=solve(prob,SimpleNewtonRaphson())
 
+
     sigg=sol.u
+    #put check for w here
     
 #    if length(b) ==1 
 #    return Participants(n1,n2,w,TriangularDist(b,b,b),Uniform(0,2pi),sigg,k,sigma_NN,p)
@@ -180,7 +182,7 @@ end
 
 
 
-@inline @fastmath function totalcross_section(w,sigmaGG,sigmaNN) #double check
+@inline function totalcross_section(w,sigmaGG,sigmaNN) #double check
 
     #(4*pi*w^2* (Base.MathConstants.γ - expinti(-(sigmagg/(4pi* w^2))) + log(sigmagg/(4pi* w^2))))
 
