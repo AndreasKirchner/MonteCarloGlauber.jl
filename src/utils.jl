@@ -292,17 +292,21 @@ end
 
 
 function generate_2ptfct(norm,batches, CoM,mList;r_grid=0:1:10,step=2pi/50)
-    finalRes=stack(tmap(1:length(batches)-1) do i
-        map(m->DifferentiationInterface.hessian(x->log(generatingfunction_h(batches[i],x,r_grid,step,CoM[i],m,norm)), AutoForwardDiff(), zeros(length(r_grid),2)),mList)
-    end)
+    finalRes=stack(map(1:length(batches)-1) do i
+        hess=zeros(eltype(r_grid),2*length(r_grid),2*length(r_grid))
+        map(m->DifferentiationInterface.hessian!(x->log(generatingfunction_h(batches[i],x,r_grid,step,CoM[i],m,norm)),hess, AutoForwardDiff(), zeros(eltype(r_grid),length(r_grid),2)),mList)
+        return hess
+    end)####From here on it is not type stable anymore
     hessianTransform=map(m->map(cc->reshape(finalRes[m,cc],(length(r_grid),2,length(r_grid),2)),1:length(batches)-1),1:length(mList))
     rIndeces=Iterators.product(1:length(r_grid),1:length(r_grid))
     twoPtFct=map(m->map(cc->map(rr->FT(hessianTransform[m][cc][rr[1],:,rr[2],:]),rIndeces),1:length(batches)-1),1:length(mList))
     return twoPtFct
 end
 
+
 function generate_2ptfct(norm,batches,CoM,m::Int,cc::Int;r_grid=0:1:10,step=2pi/50)
-    finalRes=DifferentiationInterface.hessian(x->log(generatingfunction_h(batches[cc],x,r_grid,step,CoM[cc],m,norm)), AutoForwardDiff(), zeros(length(r_grid),2))
+    hess=zeros(eltype(r_grid),2*length(r_grid),2*length(r_grid))
+    finalRes=DifferentiationInterface.hessian!(x->log(generatingfunction_h(batches[cc],x,r_grid,step,CoM[cc],m,norm)),hess, AutoForwardDiff(), zeros(eltype(r_grid),length(r_grid),2))
     hessianTransform=reshape(finalRes,(length(r_grid),2,length(r_grid),2))
     rIndeces=Iterators.product(1:length(r_grid),1:length(r_grid))
     twoPtFct=map(rr->FT(hessianTransform[rr[1],:,rr[2],:]),rIndeces)
