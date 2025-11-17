@@ -303,6 +303,15 @@ function generate_2ptfct(norm,batches, CoM,mList;r_grid=0:1:10,step=2pi/50)
     return twoPtFct
 end
 
+function generate_2ptfct_all(norm,batches,CoM,mList;r_grid=0:1:10,step=2pi/50)
+    res=zeros(ComplexF64,length(mList),length(CoM)-1,length(r_grid),length(r_grid))
+    map(1:length(batches)-1) do cc
+        map(1:length(mList)) do m
+            res[m,cc,:,:]=generate_2ptfct(norm,batches,CoM,mList[m],cc;r_grid=r_grid,step=step)
+        end
+    end
+    return res
+end
 
 function generate_2ptfct(norm,batches,CoM,m::Int,cc::Int;r_grid=0:1:10,step=2pi/50)
     hess=zeros(eltype(r_grid),2*length(r_grid),2*length(r_grid))
@@ -326,7 +335,7 @@ function generate_bg_two_pt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,
     #end
     batches, CoM=centralities_selection_CoM(events,bins;Threaded=Threaded)
     bg=generate_background(f,norm,batches,CoM,r_grid=r_grid,step=step)
-    twoPtFct_entropy=generate_2ptfct(norm,batches, CoM,mList;r_grid=r_grid,step=step)
+    twoPtFct_entropy=generate_2ptfct_all(norm,batches, CoM,mList;r_grid=r_grid,step=step)
     #@show  size(twoPtFct_entropy[1][1][1]),size(twoPtFct_entropy[1]),size(twoPtFct_entropy[1]),size(twoPtFct_entropy)
     twoPtFct=map(m->map(cc->map(r1->map(r2->twoPtFct_entropy[m][cc][r1,r2]*delta_factor(bg[cc][r1])*delta_factor(bg[cc][r2]),1:length(r_grid)),1:length(r_grid)),1:length(bg)),1:length(mList))
     #twoPtFct=map(m->map(cc->map(r1->map(r2->twoPtFct_entropy[m][cc][r1][r2],1:length(r_grid)),1:length(r_grid)),1:length(bg)),1:length(mList))
@@ -368,7 +377,7 @@ function save_bg_two_pt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sq
     #end
     batches, CoM=centralities_selection_CoM(events,bins;Threaded=Threaded)
     bg=generate_background(f,norm,batches,CoM,r_grid=r_grid,step=step)
-    twoPtFct_entropy=generate_2ptfct(norm,batches, CoM,mList;r_grid=r_grid,step=step)
+    twoPtFct_entropy=generate_2ptfct_all(norm,batches, CoM,mList;r_grid=r_grid,step=step)
     twoPtFct=map(m->map(cc->map(r1->map(r2->twoPtFct_entropy[m][cc][r1,r2]*delta_factor(bg[cc][r1])*delta_factor(bg[cc][r2]),1:length(r_grid)),1:length(r_grid)),1:length(bg)),1:length(mList))
     bgString,twoptString=construct_trento_names(participants;extensionString="dat",mMode="2")
     writedlm(bgString,bg)
