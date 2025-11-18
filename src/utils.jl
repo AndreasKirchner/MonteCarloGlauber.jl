@@ -465,7 +465,7 @@ function generate_bg_two_pt_fct_save(f,delta_factor,norm,Projectile1,Projectile2
     return bg,finalCorr;
 end
 
-function generate_bg_two_pt_fct_save_faster(f,delta_factor,norm::Float64,Projectile1,Projectile2,w::Float64,k::Float64,p::Float64,sqrtS::Float64,bins::Vector{Int64},mList::Vector{Int64};minBiasEvents=1000,r_grid=0:1.:10,step=2pi/20,Threaded=false,n_ext_Grid=0,nFields=10,
+function generate_bg_two_pt_fct_save_faster(f,delta_factor,norm::Float64,Projectile1::NucleiWoodSaxon3D,Projectile2::NucleiWoodSaxon3D,w::Float64,k::Float64,p::Float64,sqrtS::Float64,bins::Vector{Int64},mList::Vector{Int64};minBiasEvents=1000,r_grid=0:1.:10,step=2pi/20,Threaded=false,n_ext_Grid=0,nFields=10,
     extensionString="dat",path="./",override_files=false)
 #=
     # Basic validation
