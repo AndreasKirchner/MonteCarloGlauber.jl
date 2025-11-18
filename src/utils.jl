@@ -465,9 +465,9 @@ function generate_bg_two_pt_fct_save(f,delta_factor,norm,Projectile1,Projectile2
     return bg,finalCorr;
 end
 
-function generate_bg_two_pt_fct_save_faster(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins,mList;minBiasEvents=1000,r_grid=0:1:10,step=2pi/20,Threaded=true,n_ext_Grid=0,nFields=10,
+function generate_bg_two_pt_fct_save_faster(f,delta_factor,norm::Float64,Projectile1,Projectile2,w::Float64,k::Float64,p::Float64,sqrtS::Float64,bins::Vector{Int64},mList::Vector{Int64};minBiasEvents=1000,r_grid=0:1.:10,step=2pi/20,Threaded=false,n_ext_Grid=0,nFields=10,
     extensionString="dat",path="./",override_files=false)
-
+#=
     # Basic validation
     if (length(bins) + 1) * 100 > minBiasEvents
         error("Not enough events for number of bins, increase minBiasEvents")
@@ -476,8 +476,8 @@ function generate_bg_two_pt_fct_save_faster(f,delta_factor,norm,Projectile1,Proj
     # Initialize participant system and arrays
     participants = Participants(Projectile1, Projectile2, w, sqrtS, k, p)
     nGrid = max(length(r_grid), n_ext_Grid)
-    finalCorr = zeros(length(bins), 2, nFields, nFields, length(mList), nGrid, nGrid)
-    bg = zeros(length(bins), nGrid)
+    finalCorr = zeros(eltype(r_grid),length(bins), 2, nFields, nFields, length(mList), nGrid, nGrid)
+    bg = zeros(eltype(r_grid),length(bins), nGrid)
 
     # Loop over all bins
     for cc in eachindex(bins)
@@ -505,10 +505,10 @@ function generate_bg_two_pt_fct_save_faster(f,delta_factor,norm,Projectile1,Proj
             for r1 in 1:length(r_grid)
                 bg[cc,r1]=bg_small_grid[r1]
             end
-            writedlm(bgString,bg)
+            writedlm(bgString,bg[cc,:])
 
             # Generate two-point correlation functions
-            for i in eachindex(mList)
+          @inbounds  for i in eachindex(mList)
                 _, twoptString = construct_trento_names(
                     participants;
                     extensionString = extensionString,
@@ -518,20 +518,21 @@ function generate_bg_two_pt_fct_save_faster(f,delta_factor,norm,Projectile1,Proj
                 )
 
                  twoPtFct_entropy=generate_2ptfct(norm,batches,CoM,mList[i],cc;r_grid=r_grid,step=step)
-                twoPtFct=map(r1->map(r2->twoPtFct_entropy[r1,r2]*delta_factor(bg[r1])*delta_factor(bg[r2]),1:length(r_grid)),1:length(r_grid))
-                for r1 in 1:length(r_grid)
-                    for r2 in 1:length(r_grid)
+                twoPtFct=map(r1->map(r2->twoPtFct_entropy[r1,r2]*delta_factor(bg_small_grid[r1])*delta_factor(bg_small_grid[r2]),1:length(r_grid)),1:length(r_grid))
+                @inbounds for r1 in 1:length(r_grid)
+                    @inbounds for r2 in 1:length(r_grid)
                         finalCorr[cc,1,1,1,i,r1,r2]=real(twoPtFct[r1][r2])
                     end
                 end
                 writedlm(twoptString,finalCorr[cc,1,1,1,i,:,:])
+                
             end
 
         else
             # =====================================
             # READ EXISTING FILES ONLY
             # =====================================
-            bg[cc, :] = collect(readdlm(bgString))
+            bg[cc, :] = collect(readdlm(bgString,eltype(r_grid)))
 
             for i in eachindex(mList)
                 _, twoptString = construct_trento_names(
@@ -541,12 +542,13 @@ function generate_bg_two_pt_fct_save_faster(f,delta_factor,norm,Projectile1,Proj
                     cc = string(lb) * "-" * string(rb),
                     path = path
                 )
-                finalCorr[cc, 1, 1, 1, i, :, :] = collect(readdlm(twoptString))
+                finalCorr[cc, 1, 1, 1, i, :, :] = collect(readdlm(twoptString,eltype(r_grid)))
             end
         end
     end
 
     return bg, finalCorr
+    =#
 end
 
 
