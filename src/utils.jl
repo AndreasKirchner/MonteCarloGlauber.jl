@@ -231,6 +231,7 @@ end
 
 
 function batched_events(Projectile1,Projectile2,w,k,p,sqrtS,bins;minBiasEvents=1000000,threaded=true)
+    ##TODO fix to get the x
     participants=Participants(Projectile1,Projectile2,w,x,k,p)
 
     if threaded
@@ -465,9 +466,9 @@ function generate_bg_two_pt_fct_save(f,delta_factor,norm,Projectile1,Projectile2
     return bg,finalCorr;
 end
 
-function generate_bg_two_pt_fct_save_faster(f,delta_factor,norm::Float64,Projectile1::NucleiWoodSaxon3D,Projectile2::NucleiWoodSaxon3D,w::Float64,k::Float64,p::Float64,sqrtS::Float64,bins::Vector{Int64},mList::Vector{Int64};minBiasEvents=1000,r_grid=0:1.:10,step=2pi/20,Threaded=false,n_ext_Grid=0,nFields=10,
-    extensionString="dat",path="./",override_files=false)
-#=
+function generate_bg_two_pt_fct_save_faster(f,delta_factor,norm::Float64,Projectile1::NucleiWoodSaxon3D,Projectile2::NucleiWoodSaxon3D,w::Float64,k::Float64,p::Float64,sqrtS::Float64,bins::Vector{Int64},mList::Vector{Int64};minBiasEvents::Int=1000,r_grid=0:1.:10,step::Float64=2pi/20,Threaded::Bool=true,n_ext_Grid::Int=0,nFields::Int=10,
+    extensionString::String="dat",path::String="./",override_files::Bool=false)
+ 
     # Basic validation
     if (length(bins) + 1) * 100 > minBiasEvents
         error("Not enough events for number of bins, increase minBiasEvents")
@@ -548,7 +549,7 @@ function generate_bg_two_pt_fct_save_faster(f,delta_factor,norm::Float64,Project
     end
 
     return bg, finalCorr
-    =#
+    
 end
 
 
