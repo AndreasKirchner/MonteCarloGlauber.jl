@@ -29,6 +29,35 @@ end
 
 
 """
+    eccentricities(con; Nr=100, Nth=50) 
+
+Calculate the eccentricities for a given participant configuration.
+
+# Arguments
+- `con::Participant`: The participant configuration.
+- `Nr`: Number of radial divisions (default: 100).
+- `Nth`: Number of angular divisions (default: 50).
+
+# Returns
+- `SVector{5}`: The multiplicity ad x and y as static vector, 2nd order moments.
+"""
+function eccentricities(con::T;Nr=500, Nth=100) where {T<:Participant}
+    R1=con.R1
+    R2=con.R2
+    Rmax=3*(R1+R2)
+    δr=Rmax/Nr
+    δθ=2pi/Nth
+    r_range=range(δr/2,Rmax-δr/2,Nr)
+    theta_range=range(0,2pi,Nth)
+    sum(Iterators.product(enumerate(r_range),enumerate(theta_range))) do ((ir,r),(iθ, θ))
+        s,c=sincos(θ) 
+        x=r*c
+        y=r*s
+        SVector{5}(1,x,y,x^2,y^2,x*y) .*con(x,y)*r*δr*δθ
+    end 
+end
+
+"""
     multiplicity(con; Nr=100, Nth=50) 
 
 Calculate the multiplicity for a given participant configuration.
