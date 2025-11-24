@@ -53,7 +53,7 @@ function eccentricities(con::T;Nr=500, Nth=100) where {T<:Participant}
         s,c=sincos(θ) 
         x=r*c
         y=r*s
-        SVector{5}(1,x,y,x^2,y^2,x*y) .*con(x,y)*r*δr*δθ
+        SVector{6}(1,x,y,x^2,y^2,x*y) .*con(x,y)*r*δr*δθ
     end 
 end
 
