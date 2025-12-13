@@ -193,12 +193,14 @@ end
 end 
 
 
-@inline @fastmath function binary_impact_parameter_probability(b,nucleos::Participants{A,B,C,D,E,F,G,L}) where {A,B,C,D,E,F,G,L}
+@inline function binary_impact_parameter_probability(b,nucleos::Participants{A,B,C,D,E,F,G,L}) where {A,B,C,D,E,F,G,L}
     w=nucleos.sub_nucleon_width
-
-    Tnn=1/(4*pi*w^2)*exp(-b^2/(4*w^2))
-    return 1-exp(-nucleos.sigma_gg*Tnn)
-
+    gasussd=1/(4*w^2)
+    #Tnn=gasussd*exp(-b^2*gasussd)
+    #return 1-exp(-nucleos.sigma_gg*Tnn)
+    Tnn=gasussd*Base.Math.exp_fast(-b^2*gasussd)
+    return 1-Base.Math.exp_fast(-nucleos.sigma_gg*Tnn)
+    
 end 
 
 
@@ -221,40 +223,44 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
     b=rand(rng,nucleos.inpact_parameter_magitude)
     b_vec= SVector{2}(b*c_th/2,b*s_th/2)
     ncoll=0
-    @inbounds for nucl1 in axes(n1,1)
+        @inbounds for nucl1 in axes(n1,1)
         pos1=SVector{2}(n1[nucl1,1],n1[nucl1,2])
         pos1rotshift= pos1 -b_vec
-        x_1=pos1rotshift[1]
-        y_1=pos1rotshift[2]
+        #x_1=pos1rotshift[1]
+        #y_1=pos1rotshift[2]
         @inbounds for nucl2 in axes(n2,1)    
             pos2=SVector{2}(n1[nucl2,1],n2[nucl2,2])  
            # @show pos2 
             pos2rotshift= pos2 +b_vec
-            x_2=pos2rotshift[1]
-            y_2=pos2rotshift[2]
-            impact_par=hypot(x_1-x_2,y_1-y_2)
+            #x_2=pos2rotshift[1]
+            #y_2=pos2rotshift[2]
+
+            impact_par= norm(pos1rotshift - pos2rotshift)
+            #impact_par=hypot(x_1-x_2,y_1-y_2)
             probability=binary_impact_parameter_probability(impact_par,nucleos)
            
             #accepted 
-            if rand(rng,Bernoulli(probability))  
+                if rand(rng,Bernoulli(probability))  
                 #@show probability, impact_par
-                push!(re1,SVector{2}(x_1,y_1))
-                push!(re2,SVector{2}(x_2,y_2))  
-                ncoll+=1 
-            end       
+                #push!(re1,SVector{2}(x_1,y_1))
+                #push!(re2,SVector{2}(x_2,y_2)) 
+                    push!(re1,pos1rotshift)
+                    push!(re2,pos2rotshift)  
+                    ncoll+=1 
+                end       
+            end 
         end 
-    end 
 
-    if ncoll>0 
-        r1=unique(re1)
-        r2=unique(re2)
-        k=nucleos.shape_parameter
-        distribution=Gamma(k,1/k)
-        shape_1=rand(rng,distribution,length(r1))
-        shape_2=rand(rng,distribution,length(r2))
-        return Participant(r1,r2,shape_1,shape_2,ncoll,nucleos.sub_nucleon_width,nucleos.shape_parameter,nucleos.p,R1,R2,b)
-    end 
-    end 
+        if ncoll>0 
+            r1=unique(re1)
+            r2=unique(re2)
+            k=nucleos.shape_parameter
+            distribution=Gamma(k,1/k)
+            shape_1=rand(rng,distribution,length(r1))
+            shape_2=rand(rng,distribution,length(r2))
+            return Participant(r1,r2,shape_1,shape_2,ncoll,nucleos.sub_nucleon_width,nucleos.shape_parameter,nucleos.p,R1,R2,b)
+        end 
+    end  
 end
 
 
