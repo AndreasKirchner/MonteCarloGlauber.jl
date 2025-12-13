@@ -193,13 +193,13 @@ end
 end 
 
 
-@inline function binary_impact_parameter_probability(b,nucleos::Participants{A,B,C,D,E,F,G,L}) where {A,B,C,D,E,F,G,L}
+@inline @fastmath function binary_impact_parameter_probability(b2,nucleos::Participants{A,B,C,D,E,F,G,L}) where {A,B,C,D,E,F,G,L}
     w=nucleos.sub_nucleon_width
     gasussd=1/(4*w^2)
     #Tnn=gasussd*exp(-b^2*gasussd)
     #return 1-exp(-nucleos.sigma_gg*Tnn)
-    Tnn=gasussd*Base.Math.exp_fast(-b^2*gasussd)
-    return 1-Base.Math.exp_fast(-nucleos.sigma_gg*Tnn)
+    Tnn=gasussd*Base.Math.exp_fast(-b2*gasussd)
+    return one(Tnn) -Base.Math.exp_fast(-nucleos.sigma_gg*Tnn)
     
 end 
 
@@ -235,7 +235,8 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
             #x_2=pos2rotshift[1]
             #y_2=pos2rotshift[2]
 
-            impact_par= norm(pos1rotshift - pos2rotshift)
+            v=pos1rotshift - pos2rotshift
+            impact_par= dot(v, v)#norm(pos1rotshift - pos2rotshift)
             #impact_par=hypot(x_1-x_2,y_1-y_2)
             probability=binary_impact_parameter_probability(impact_par,nucleos)
            
