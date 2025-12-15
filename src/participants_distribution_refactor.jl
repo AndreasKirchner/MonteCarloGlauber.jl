@@ -20,8 +20,8 @@ impactParameter(x::Participant{T,S,V,M,C,D,F} ) where {T,S,V,M,C,D,F} = x.b
 Base.eltype(::Participant{T,S,V,M,C,D,F} ) where {T,S,V,M,C,D,F}  = promote_type(T,S)
 
 @inline @fastmath function Tp(x,y,w)
-    w2=2*w^2
-    1/(pi*w2)*exp(-(x^2+y^2)/w2)
+    invw2=1/(2*w^2)
+    1/(pi)*invw2*exp(-(x^2+y^2)*invw2)
 end
 
 @inline @fastmath function pmeanpos(a,b,p)
@@ -34,10 +34,10 @@ end
 
 
 @inline function pmean(a,b,p)
-    
     if p==0
-        return pmeanzer(a,b)
-    end 
+        return sqrt(a*b)
+    end
+
     return pmeanpos(a,b,p)
 end
 
@@ -46,7 +46,13 @@ function cross_section_from_energy(sqrtS) #returns the cross section for sqrtS i
     return (0.073491826*log(sqrtS)-.19313457)*log(sqrtS)+3.123737545
 end
 
-function (f::Participant{T,S,V,M,C,D,F} )(x,y) where {T,S,V,M,C,D,F}
+@inline function (f::Participant{T,S,V,M,C,D,F} )(x,y) where {T,S,V,M,C,D,F}
+
+    fluctuating_thickness(x,y,f)
+
+end
+
+function fluctuating_thickness(x::Num1,y::Num2,f::Participant{T,S,V,M,C,D,F} ) where {Num1<:Real,Num2<:Real,T,S,V,M,C,D,F}
 
     part1=f.part1
     part2=f.part2
@@ -55,38 +61,28 @@ function (f::Participant{T,S,V,M,C,D,F} )(x,y) where {T,S,V,M,C,D,F}
     w= f.sub_nucleon_width
     p=f.p
 
-    start=zero(eltype(f))
-    ta=sum(zip(part1,shape1);init=start) do (pa ,ga)
-        ga*Tp(x-pa[1],y-pa[2],w)
-    end 
-    start=zero(eltype(f))
-    tb=sum(zip(part2,shape2);init=start) do (pa ,ga)
-        ga*Tp(x-pa[1],y-pa[2],w)
-    end 
+    ta=zero(eltype(f))
+    tb=zero(eltype(f))
+
+    @inbounds @fastmath for i in eachindex(part1)
+        pa_x,pa_y=part1[i]
+        ga=shape1[i]
+        ta+=ga*Tp(x-pa_x,y-pa_y,w)
+    end
+    
+    @inbounds @fastmath for i in eachindex(part2)
+        pa_x,pa_y=part2[i]
+        ga=shape2[i]
+        tb+=ga*Tp(x-pa_x,y-pa_y,w)
+    end
 
     return pmean(ta,tb,p)#norm((ta,tb),p)
+end 
 
-end
-
-function fluctuating_thickness(x::Num1,y::Num2,part::Participant{T,S,V,M,C,D,F} ) where {Num1<:Real,Num2<:Real,T,S,V,M,C,D,F}
-
-    part1=part.part1
-    part2=part.part2
-    shape1=part.shape1
-    shape2=part.shape2
-    w= part.sub_nucleon_width
-    p=part.p
-
-    start=zero(eltype(part))
-    ta=sum(zip(part1,shape1);init=start) do (pa ,ga)
-        ga*Tp(x-pa[1],y-pa[2],w)
+function fluctuating_thickness(x::Num1,y::Num2,f::Vector{Participant{T,S,V,M,C,D,F}} ) where {Num1<:Real,Num2<:Real,T,S,V,M,C,D,F}
+    map(f) do f_i
+        fluctuating_thickness(x,y,f_i)
     end 
-    start=zero(eltype(part))
-    tb=sum(zip(part2,shape2);init=start) do (pa ,ga)
-        ga*Tp(x-pa[1],y-pa[2],w)
-    end 
-
-    return pmean(ta,tb,p)#norm((ta,tb),p)
 end 
 
 

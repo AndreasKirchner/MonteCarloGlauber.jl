@@ -11,7 +11,7 @@ Calculate the center of mass for a given participant configuration.
 # Returns
 - `SVector{3}`: The multiplicity ad x and y as static vector.
 """
-function center_of_mass(con::T;Nr=100, Nth=50) where {T<:Participant}
+function center_of_mass(con::T,Nr=100, Nth=50) where {T<:Participant}
     R1=con.R1
     R2=con.R2
     Rmax=3*(R1+R2)
@@ -19,12 +19,26 @@ function center_of_mass(con::T;Nr=100, Nth=50) where {T<:Participant}
     δθ=2pi/Nth
     r_range=range(δr/2,Rmax-δr/2,Nr)
     theta_range=range(0,2pi,Nth)
-    sum(Iterators.product(enumerate(r_range),enumerate(theta_range))) do ((ir,r),(iθ, θ))
-        s,c=sincos(θ) 
-        x=r*c
-        y=r*s
-        SVector{3}(1.,x,y) .*con(x,y)*r*δr*δθ
+    #sum(Iterators.product(enumerate(r_range),enumerate(theta_range))) do ((ir,r),(iθ, θ))
+    Δ=δr*δθ
+    mult=zero(eltype(con))
+    x_cm=zero(eltype(con))
+    y_cm=zero(eltype(con))
+    @fastmath for  θ in theta_range
+        s,c=sincos(θ)
+        @fastmath for r in r_range  
+            x=r*c
+            y=r*s
+            mesure=Δ*r
+            multiplicity=con(x,y)*mesure
+            
+            mult +=multiplicity
+            x_cm +=multiplicity*x
+            y_cm +=multiplicity*y
+           
+        end 
     end 
+    return (mult,x_cm,y_cm)
 end
 
 
@@ -70,7 +84,7 @@ Calculate the multiplicity for a given participant configuration.
 # Returns
 - The multiplicity ad x and y as static vector.
 """
-function multiplicity(con::T;Nr=100, Nth=50) where {T<:Participant}
+function multiplicity(con::T,Nr=100, Nth=50) where {T<:Participant}
     R1=con.R1
     R2=con.R2
     Rmax=3*(R1+R2)
@@ -78,12 +92,21 @@ function multiplicity(con::T;Nr=100, Nth=50) where {T<:Participant}
     δθ=2pi/Nth
     r_range=range(δr/2,Rmax-δr/2,Nr)
     theta_range=range(0,2pi,Nth)
-    sum(Iterators.product(enumerate(r_range),enumerate(theta_range))) do ((ir,r),(iθ, θ))
-        s,c=sincos(θ) 
-        x=r*c
-        y=r*s
-        con(x,y)*r*δr*δθ
+    #sum(Iterators.product(enumerate(r_range),enumerate(theta_range))) do ((ir,r),(iθ, θ))
+    Δ=δr*δθ
+    mult=zero(eltype(con))
+    @fastmath for  θ in theta_range
+        s,c=sincos(θ)
+        @fastmath for r in r_range  
+            x=r*c
+            y=r*s
+            mesure=Δ*r
+            multiplicity=con(x,y)*mesure
+            mult +=multiplicity
+           
+        end 
     end 
+    return mult
 end
 
 
