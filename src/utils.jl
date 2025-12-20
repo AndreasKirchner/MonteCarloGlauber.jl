@@ -26,7 +26,7 @@ function center_of_mass(con::T,Nr=100, Nth=50) where {T<:Participant}
     y_cm=zero(eltype(con))
     @fastmath for  θ in theta_range
         s,c=sincos(θ)
-        @fastmath for r in r_range  
+        @fastmath @simd for r in r_range  
             x=r*c
             y=r*s
             mesure=Δ*r
@@ -39,6 +39,95 @@ function center_of_mass(con::T,Nr=100, Nth=50) where {T<:Participant}
         end 
     end 
     return (mult,x_cm,y_cm)
+end
+
+"""
+    center_of_mass_gl(con; Nr=64, Nth=64)
+
+Compute center of mass using Gauss–Legendre quadrature in r and trapezoidal rule in θ.
+This converges faster than the uniform grid for smooth profiles.
+
+# Arguments
+- `con::Participant`: The participant configuration.
+- `Nr`: Number of Gauss–Legendre nodes (radial).
+- `Nth`: Number of angular divisions (trapezoid).
+
+# Returns
+- `(mult, x_cm, y_cm)`: Multiplicity and first moments.
+"""
+@inline function center_of_mass_gl(con::T, Nr=64, Nth=64) where {T<:Participant}
+  center_of_mass_gl!(con, prepare_accumulation(con, Nr, Nth))
+end
+
+"""
+    prepare_accumulation(con, Nr=64, Nth=64)
+
+Pre-compute radial nodes/weights mapped to [0, Rmax] and sin/cos arrays for θ.
+Returns a NamedTuple (r_vals, r_weights, sinθ, cosθ) ready for use in _gl! functions.
+
+# Arguments
+- `con::Participant`: participant to get R1, R2 from.
+- `Nr`: Number of Gauss–Legendre nodes (radial).
+- `Nth`: Number of angular divisions.
+"""
+function prepare_accumulation(con::T, Nr=64, Nth=64) where {T<:Participant}
+    Rmax = 3 * (con.R1 + con.R2)
+    half_R = Rmax / 2
+    Δθ = 2pi / Nth
+    
+    r_nodes, r_w = FastGaussQuadrature.gausslegendre(Nr)
+    
+    # Pre-map nodes to [0, Rmax] and compute full weights (Jacobian * r * Δθ)
+    r_vals = (r_nodes .+ 1) .* half_R
+    r_weights = r_w .* half_R .* r_vals .* Δθ
+    
+    # Pre-compute sin/cos for all θ values
+    θ_vals = [(j * Δθ) for j in 0:(Nth-1)]
+    sinθ = sin.(θ_vals)
+    cosθ = cos.(θ_vals)
+    
+    return (r_vals=r_vals, r_weights=r_weights, sinθ=sinθ, cosθ=cosθ)
+end
+
+# Legacy version for backward compatibility
+@inline function prepare_accumulation(Nr::Integer)
+    FastGaussQuadrature.gausslegendre(Nr)
+end
+
+"""
+    center_of_mass_gl!(con, cache)
+
+Non-allocating variant using pre-computed cache from `prepare_accumulation(con, Nr, Nth)`.
+
+# Arguments
+- `con::Participant`: configuration to integrate.
+- `cache`: NamedTuple with (r_vals, r_weights, sinθ, cosθ).
+
+# Returns
+- `(mult, x_cm, y_cm)`: Multiplicity and first moments.
+"""
+function center_of_mass_gl!(con::T, cache) where {T<:Participant}
+    r_vals, r_weights, sinθ, cosθ = cache.r_vals, cache.r_weights, cache.sinθ, cache.cosθ
+
+    mult = zero(eltype(con))
+    x_cm = zero(eltype(con))
+    y_cm = zero(eltype(con))
+
+    @inbounds for j in eachindex(sinθ)
+        s, c = sinθ[j], cosθ[j]
+        @inbounds @simd for i in eachindex(r_vals)
+            r = r_vals[i]
+            w = r_weights[i]
+            x = r * c
+            y = r * s
+            m = con(x, y) * w
+            mult += m
+            x_cm += m * x
+            y_cm += m * y
+        end
+    end
+
+    return (mult, x_cm, y_cm)
 end
 
 
@@ -69,6 +158,40 @@ function eccentricities(con::T;Nr=500, Nth=100) where {T<:Participant}
         y=r*s
         SVector{6}(1,x,y,x^2,y^2,x*y) .*con(x,y)*r*δr*δθ
     end 
+end
+
+"""
+    eccentricities_gl(con; Nr=64, Nth=64)
+
+Compute eccentricities using Gauss–Legendre quadrature in r and trapezoidal rule in θ.
+"""
+@inline function eccentricities_gl(con::T; Nr=64, Nth=64) where {T<:Participant}
+    eccentricities_gl!(con, prepare_accumulation(con, Nr, Nth))
+end
+
+"""
+    eccentricities_gl!(con, cache)
+
+Non-allocating variant for eccentricities using pre-computed cache.
+"""
+function eccentricities_gl!(con::T, cache) where {T<:Participant}
+    r_vals, r_weights, sinθ, cosθ = cache.r_vals, cache.r_weights, cache.sinθ, cache.cosθ
+
+    result = @SVector zeros(eltype(con), 6)
+
+    @inbounds for j in eachindex(sinθ)
+        s, c = sinθ[j], cosθ[j]
+        @inbounds for i in eachindex(r_vals)
+            r = r_vals[i]
+            w = r_weights[i]
+            x = r * c
+            y = r * s
+            m = con(x, y) * w
+            result = result + SVector{6}(m, m*x, m*y, m*x^2, m*y^2, m*x*y)
+        end
+    end
+
+    return result
 end
 
 """
@@ -107,6 +230,69 @@ function multiplicity(con::T,Nr=100, Nth=50) where {T<:Participant}
         end 
     end 
     return mult
+end
+
+"""
+    multiplicity_gl(con; Nr=64, Nth=64)
+
+Compute multiplicity using Gauss–Legendre quadrature in r and trapezoidal rule in θ.
+"""
+@inline function multiplicity_gl(con::T; Nr=64, Nth=64) where {T<:Participant}
+    multiplicity_gl!(con, prepare_accumulation(con, Nr, Nth))
+end
+
+"""
+    multiplicity_gl!(con, cache)
+
+Non-allocating variant for multiplicity using pre-computed cache.
+"""
+function multiplicity_gl!(con::T, cache) where {T<:Participant}
+    r_vals, r_weights, sinθ, cosθ = cache.r_vals, cache.r_weights, cache.sinθ, cache.cosθ
+
+    mult = zero(eltype(con))
+
+    @inbounds for j in eachindex(sinθ)
+        s, c = sinθ[j], cosθ[j]
+        @inbounds @simd for i in eachindex(r_vals)
+            r = r_vals[i]
+            w = r_weights[i]
+            x = r * c
+            y = r * s
+            mult += con(x, y) * w
+        end
+    end
+
+    return mult
+end
+
+"""
+    shift_and_compute(participant)
+
+Shift nucleon positions to the center of mass and return the shifted participant
+along with its multiplicity.
+
+# Arguments
+- `participant::Participant`: configuration to shift and evaluate.
+
+# Returns
+- `(Participant, multiplicity)`: shifted participant and its multiplicity.
+"""
+function shift_and_compute(participant::Participant)
+    mult_val, x_cm, y_cm = center_of_mass(participant)
+    if mult_val == 0
+        return participant, mult_val
+    end
+
+    shift_vec = SVector{2}(x_cm / mult_val, y_cm / mult_val)
+    r1_shifted = participant.part1 .- shift_vec
+    r2_shifted = participant.part2 .- shift_vec
+
+    shifted = Participant(r1_shifted, r2_shifted, participant.shape1, participant.shape2,
+                          participant.n_coll, participant.sub_nucleon_width, participant.shape_parameter,
+                          participant.p, participant.R1, participant.R2, participant.b)
+
+   
+    return shifted, mult_val
 end
 
 
