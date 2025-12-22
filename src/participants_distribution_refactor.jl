@@ -20,8 +20,8 @@ impactParameter(x::Participant{T,S,V,M,C,D,F} ) where {T,S,V,M,C,D,F} = x.b
 Base.eltype(::Participant{T,S,V,M,C,D,F} ) where {T,S,V,M,C,D,F}  = promote_type(T,S)
 
 @inline @fastmath function Tp(x,y,w)
-    w2=2*w^2
-    1/(pi*w2)*exp(-(x^2+y^2)/w2)
+    invw2=1/(2*w^2)
+    1/(pi)*invw2*exp(-(x^2+y^2)*invw2)
 end
 
 @inline @fastmath function pmeanpos(a,b,p)
@@ -34,10 +34,10 @@ end
 
 
 @inline function pmean(a,b,p)
-    
     if p==0
-        return pmeanzer(a,b)
-    end 
+        return sqrt(a*b)
+    end
+
     return pmeanpos(a,b,p)
 end
 
@@ -46,7 +46,13 @@ function cross_section_from_energy(sqrtS) #returns the cross section for sqrtS i
     return (0.073491826*log(sqrtS)-.19313457)*log(sqrtS)+3.123737545
 end
 
-function (f::Participant{T,S,V,M,C,D,F} )(x,y) where {T,S,V,M,C,D,F}
+@inline function (f::Participant{T,S,V,M,C,D,F} )(x,y) where {T,S,V,M,C,D,F}
+
+    fluctuating_thickness(x,y,f)
+
+end
+
+function fluctuating_thickness(x::Num1,y::Num2,f::Participant{T,S,V,M,C,D,F} ) where {Num1<:Real,Num2<:Real,T,S,V,M,C,D,F}
 
     part1=f.part1
     part2=f.part2
@@ -55,38 +61,28 @@ function (f::Participant{T,S,V,M,C,D,F} )(x,y) where {T,S,V,M,C,D,F}
     w= f.sub_nucleon_width
     p=f.p
 
-    start=zero(eltype(f))
-    ta=sum(zip(part1,shape1);init=start) do (pa ,ga)
-        ga*Tp(x-pa[1],y-pa[2],w)
-    end 
-    start=zero(eltype(f))
-    tb=sum(zip(part2,shape2);init=start) do (pa ,ga)
-        ga*Tp(x-pa[1],y-pa[2],w)
-    end 
+    ta=zero(eltype(f))
+    tb=zero(eltype(f))
+
+    @inbounds @fastmath for i in eachindex(part1)
+        pa_x,pa_y=part1[i]
+        ga=shape1[i]
+        ta+=ga*Tp(x-pa_x,y-pa_y,w)
+    end
+    
+    @inbounds @fastmath for i in eachindex(part2)
+        pa_x,pa_y=part2[i]
+        ga=shape2[i]
+        tb+=ga*Tp(x-pa_x,y-pa_y,w)
+    end
 
     return pmean(ta,tb,p)#norm((ta,tb),p)
+end 
 
-end
-
-function fluctuating_thickness(x::Num1,y::Num2,part::Participant{T,S,V,M,C,D,F} ) where {Num1<:Real,Num2<:Real,T,S,V,M,C,D,F}
-
-    part1=part.part1
-    part2=part.part2
-    shape1=part.shape1
-    shape2=part.shape2
-    w= part.sub_nucleon_width
-    p=part.p
-
-    start=zero(eltype(part))
-    ta=sum(zip(part1,shape1);init=start) do (pa ,ga)
-        ga*Tp(x-pa[1],y-pa[2],w)
+function fluctuating_thickness(x::Num1,y::Num2,f::Vector{Participant{T,S,V,M,C,D,F}} ) where {Num1<:Real,Num2<:Real,T,S,V,M,C,D,F}
+    map(f) do f_i
+        fluctuating_thickness(x,y,f_i)
     end 
-    start=zero(eltype(part))
-    tb=sum(zip(part2,shape2);init=start) do (pa ,ga)
-        ga*Tp(x-pa[1],y-pa[2],w)
-    end 
-
-    return pmean(ta,tb,p)#norm((ta,tb),p)
 end 
 
 
@@ -118,19 +114,21 @@ function Participants
 
 end 
 
-function Participants(n1,n2,w,s_NN,k,p,b)
+function Participants(n1,n2,w,s_NN,k,p,b::Tuple{T1,T2}) where {T1<:Real,T2<:Real}
 
     sigma_NN=cross_section_from_energy(s_NN)
     f(sigmagg,p)=totalcross_section(w,sigmagg,sigma_NN) 
-    u0 = 1.
-    prob = NonlinearProblem(f, u0)
+    u0 =one(sigma_NN) #one(eltype(f))
+    prob = NonlinearProblem{false}(f, u0)
     sol=solve(prob,SimpleNewtonRaphson())
 
+
     sigg=sol.u
+    #put check for w here
     
-    if length(b) ==1 
-    return Participants(n1,n2,w,TriangularDist(b,b,b),Uniform(0,2pi),sigg,k,sigma_NN,p)
-    end 
+#    if length(b) ==1 
+#    return Participants(n1,n2,w,TriangularDist(b,b,b),Uniform(0,2pi),sigg,k,sigma_NN,p)
+#    end 
 
     return Participants(n1,n2,w,truncated(TriangularDist(0,b[2],b[2]),b[1],b[2]),Uniform(0,2pi),sigg,k,sigma_NN,p)
     #Participants(n1,n2,w,truncated(TriangularDist(0,b[2],b[2]),b[1],b[2]),Uniform(0,2pi),sigg,k,Float64(sigma_NN),p)
@@ -162,25 +160,25 @@ function Base.copy(s::Participants{A,B,C,D,E,F,G,L}) where {A,B,C,D,E,F,G,L}
 
 
     b=unique(Distributions.params(s.inpact_parameter_magitude))
-
+#=
 if length(b)==1
     
     return Participants(copy(s.nucl1),copy(s.nucl2),s.sub_nucleon_width,TriangularDist(first(b),first(b),first(b)),Uniform(0,2pi),s.sigma_gg,s.shape_parameter,s.total_cross_section,s.p)
 
 end
-
-if length(b)==2
+=#
+#if length(b)==2
 
     return Participants(copy(s.nucl1),copy(s.nucl2),s.sub_nucleon_width,
     truncated(TriangularDist(0,b[2],b[2]),b[1],b[2]),Uniform(0,2pi),s.sigma_gg,s.shape_parameter,s.total_cross_section,s.p)
 
-end
+#end
 
 end 
 
 
 
-@inline @fastmath function totalcross_section(w,sigmaGG,sigmaNN) #double check
+@inline function totalcross_section(w,sigmaGG,sigmaNN) #double check
 
     #(4*pi*w^2* (Base.MathConstants.γ - expinti(-(sigmagg/(4pi* w^2))) + log(sigmagg/(4pi* w^2))))
 
@@ -191,12 +189,14 @@ end
 end 
 
 
-@inline @fastmath function binary_impact_parameter_probability(b,nucleos::Participants{A,B,C,D,E,F,G,L}) where {A,B,C,D,E,F,G,L}
+@inline @fastmath function binary_impact_parameter_probability(b2,nucleos::Participants{A,B,C,D,E,F,G,L}) where {A,B,C,D,E,F,G,L}
     w=nucleos.sub_nucleon_width
-
-    Tnn=1/(4*pi*w^2)*exp(-b^2/(4*w^2))
-    return 1-exp(-nucleos.sigma_gg*Tnn)
-
+    gasussd=1/(4*w^2)
+    #Tnn=gasussd*exp(-b^2*gasussd)
+    #return 1-exp(-nucleos.sigma_gg*Tnn)
+    Tnn=gasussd*Base.Math.exp_fast(-b2*gasussd)
+    return one(Tnn) -Base.Math.exp_fast(-nucleos.sigma_gg*Tnn)
+    
 end 
 
 
@@ -219,40 +219,45 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
     b=rand(rng,nucleos.inpact_parameter_magitude)
     b_vec= SVector{2}(b*c_th/2,b*s_th/2)
     ncoll=0
-    @inbounds for nucl1 in axes(n1,1)
+        @inbounds for nucl1 in axes(n1,1)
         pos1=SVector{2}(n1[nucl1,1],n1[nucl1,2])
         pos1rotshift= pos1 -b_vec
-        x_1=pos1rotshift[1]
-        y_1=pos1rotshift[2]
+        #x_1=pos1rotshift[1]
+        #y_1=pos1rotshift[2]
         @inbounds for nucl2 in axes(n2,1)    
             pos2=SVector{2}(n1[nucl2,1],n2[nucl2,2])  
            # @show pos2 
             pos2rotshift= pos2 +b_vec
-            x_2=pos2rotshift[1]
-            y_2=pos2rotshift[2]
-            impact_par=hypot(x_1-x_2,y_1-y_2)
+            #x_2=pos2rotshift[1]
+            #y_2=pos2rotshift[2]
+
+            v=pos1rotshift - pos2rotshift
+            impact_par= dot(v, v)#norm(pos1rotshift - pos2rotshift)
+            #impact_par=hypot(x_1-x_2,y_1-y_2)
             probability=binary_impact_parameter_probability(impact_par,nucleos)
            
             #accepted 
-            if rand(rng,Bernoulli(probability))  
+                if rand(rng,Bernoulli(probability))  
                 #@show probability, impact_par
-                push!(re1,SVector{2}(x_1,y_1))
-                push!(re2,SVector{2}(x_2,y_2))  
-                ncoll+=1 
-            end       
+                #push!(re1,SVector{2}(x_1,y_1))
+                #push!(re2,SVector{2}(x_2,y_2)) 
+                    push!(re1,pos1rotshift)
+                    push!(re2,pos2rotshift)  
+                    ncoll+=1 
+                end       
+            end 
         end 
-    end 
 
-    if ncoll>0 
-        r1=unique(re1)
-        r2=unique(re2)
-        k=nucleos.shape_parameter
-        distribution=Gamma(k,1/k)
-        shape_1=rand(rng,distribution,length(r1))
-        shape_2=rand(rng,distribution,length(r2))
-        return Participant(r1,r2,shape_1,shape_2,ncoll,nucleos.sub_nucleon_width,nucleos.shape_parameter,nucleos.p,R1,R2,b)
-    end 
-    end 
+        if ncoll>0 
+            r1=unique(re1)
+            r2=unique(re2)
+            k=nucleos.shape_parameter
+            distribution=Gamma(k,1/k)
+            shape_1=rand(rng,distribution,length(r1))
+            shape_2=rand(rng,distribution,length(r2))
+            return Participant(r1,r2,shape_1,shape_2,ncoll,nucleos.sub_nucleon_width,nucleos.shape_parameter,nucleos.p,R1,R2,b)
+        end 
+    end  
 end
 
 
