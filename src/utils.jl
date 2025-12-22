@@ -11,7 +11,140 @@ Calculate the center of mass for a given participant configuration.
 # Returns
 - `SVector{3}`: The multiplicity ad x and y as static vector.
 """
-function center_of_mass(con::T;Nr=100, Nth=50) where {T<:Participant}
+function center_of_mass(con::T,Nr=100, Nth=50) where {T<:Participant}
+    R1=con.R1
+    R2=con.R2
+    Rmax=3*(R1+R2)
+    δr=Rmax/Nr
+    δθ=2pi/Nth
+    r_range=range(δr/2,Rmax-δr/2,Nr)
+    theta_range=range(0,2pi,Nth)
+    #sum(Iterators.product(enumerate(r_range),enumerate(theta_range))) do ((ir,r),(iθ, θ))
+    Δ=δr*δθ
+    mult=zero(eltype(con))
+    x_cm=zero(eltype(con))
+    y_cm=zero(eltype(con))
+    @fastmath for  θ in theta_range
+        s,c=sincos(θ)
+        @fastmath @simd for r in r_range  
+            x=r*c
+            y=r*s
+            mesure=Δ*r
+            multiplicity=con(x,y)*mesure
+            
+            mult +=multiplicity
+            x_cm +=multiplicity*x
+            y_cm +=multiplicity*y
+           
+        end 
+    end 
+    return (mult,x_cm,y_cm)
+end
+
+"""
+    center_of_mass_gl(con; Nr=64, Nth=64)
+
+Compute center of mass using Gauss–Legendre quadrature in r and trapezoidal rule in θ.
+This converges faster than the uniform grid for smooth profiles.
+
+# Arguments
+- `con::Participant`: The participant configuration.
+- `Nr`: Number of Gauss–Legendre nodes (radial).
+- `Nth`: Number of angular divisions (trapezoid).
+
+# Returns
+- `(mult, x_cm, y_cm)`: Multiplicity and first moments.
+"""
+@inline function center_of_mass_gl(con::T, Nr=64, Nth=64) where {T<:Participant}
+  center_of_mass_gl!(con, prepare_accumulation(con, Nr, Nth))
+end
+
+"""
+    prepare_accumulation(con, Nr=64, Nth=64)
+
+Pre-compute radial nodes/weights mapped to [0, Rmax] and sin/cos arrays for θ.
+Returns a NamedTuple (r_vals, r_weights, sinθ, cosθ) ready for use in _gl! functions.
+
+# Arguments
+- `con::Participant`: participant to get R1, R2 from.
+- `Nr`: Number of Gauss–Legendre nodes (radial).
+- `Nth`: Number of angular divisions.
+"""
+function prepare_accumulation(con::T, Nr=64, Nth=64) where {T<:Participant}
+    Rmax = 3 * (con.R1 + con.R2)
+    half_R = Rmax / 2
+    Δθ = 2pi / Nth
+    
+    r_nodes, r_w = FastGaussQuadrature.gausslegendre(Nr)
+    
+    # Pre-map nodes to [0, Rmax] and compute full weights (Jacobian * r * Δθ)
+    r_vals = (r_nodes .+ 1) .* half_R
+    r_weights = r_w .* half_R .* r_vals .* Δθ
+    
+    # Pre-compute sin/cos for all θ values
+    θ_vals = [(j * Δθ) for j in 0:(Nth-1)]
+    sinθ = sin.(θ_vals)
+    cosθ = cos.(θ_vals)
+    
+    return (r_vals=r_vals, r_weights=r_weights, sinθ=sinθ, cosθ=cosθ)
+end
+
+# Legacy version for backward compatibility
+@inline function prepare_accumulation(Nr::Integer)
+    FastGaussQuadrature.gausslegendre(Nr)
+end
+
+"""
+    center_of_mass_gl!(con, cache)
+
+Non-allocating variant using pre-computed cache from `prepare_accumulation(con, Nr, Nth)`.
+
+# Arguments
+- `con::Participant`: configuration to integrate.
+- `cache`: NamedTuple with (r_vals, r_weights, sinθ, cosθ).
+
+# Returns
+- `(mult, x_cm, y_cm)`: Multiplicity and first moments.
+"""
+function center_of_mass_gl!(con::T, cache) where {T<:Participant}
+    r_vals, r_weights, sinθ, cosθ = cache.r_vals, cache.r_weights, cache.sinθ, cache.cosθ
+
+    mult = zero(eltype(con))
+    x_cm = zero(eltype(con))
+    y_cm = zero(eltype(con))
+
+    @inbounds for j in eachindex(sinθ)
+        s, c = sinθ[j], cosθ[j]
+        @inbounds @simd for i in eachindex(r_vals)
+            r = r_vals[i]
+            w = r_weights[i]
+            x = r * c
+            y = r * s
+            m = con(x, y) * w
+            mult += m
+            x_cm += m * x
+            y_cm += m * y
+        end
+    end
+
+    return (mult, x_cm, y_cm)
+end
+
+
+"""
+    eccentricities(con; Nr=100, Nth=50) 
+
+Calculate the eccentricities for a given participant configuration.
+
+# Arguments
+- `con::Participant`: The participant configuration.
+- `Nr`: Number of radial divisions (default: 100).
+- `Nth`: Number of angular divisions (default: 50).
+
+# Returns
+- `SVector{5}`: The multiplicity ad x and y as static vector, 2nd order moments.
+"""
+function eccentricities(con::T;Nr=500, Nth=100) where {T<:Participant}
     R1=con.R1
     R2=con.R2
     Rmax=3*(R1+R2)
@@ -23,10 +156,43 @@ function center_of_mass(con::T;Nr=100, Nth=50) where {T<:Participant}
         s,c=sincos(θ) 
         x=r*c
         y=r*s
-        SVector{3}(1,x,y) .*con(x,y)*r*δr*δθ
+        SVector{6}(1,x,y,x^2,y^2,x*y) .*con(x,y)*r*δr*δθ
     end 
 end
 
+"""
+    eccentricities_gl(con; Nr=64, Nth=64)
+
+Compute eccentricities using Gauss–Legendre quadrature in r and trapezoidal rule in θ.
+"""
+@inline function eccentricities_gl(con::T; Nr=64, Nth=64) where {T<:Participant}
+    eccentricities_gl!(con, prepare_accumulation(con, Nr, Nth))
+end
+
+"""
+    eccentricities_gl!(con, cache)
+
+Non-allocating variant for eccentricities using pre-computed cache.
+"""
+function eccentricities_gl!(con::T, cache) where {T<:Participant}
+    r_vals, r_weights, sinθ, cosθ = cache.r_vals, cache.r_weights, cache.sinθ, cache.cosθ
+
+    result = @SVector zeros(eltype(con), 6)
+
+    @inbounds for j in eachindex(sinθ)
+        s, c = sinθ[j], cosθ[j]
+        @inbounds for i in eachindex(r_vals)
+            r = r_vals[i]
+            w = r_weights[i]
+            x = r * c
+            y = r * s
+            m = con(x, y) * w
+            result = result + SVector{6}(m, m*x, m*y, m*x^2, m*y^2, m*x*y)
+        end
+    end
+
+    return result
+end
 
 """
     multiplicity(con; Nr=100, Nth=50) 
@@ -41,7 +207,7 @@ Calculate the multiplicity for a given participant configuration.
 # Returns
 - The multiplicity ad x and y as static vector.
 """
-function multiplicity(con::T;Nr=100, Nth=50) where {T<:Participant}
+function multiplicity(con::T,Nr=100, Nth=50) where {T<:Participant}
     R1=con.R1
     R2=con.R2
     Rmax=3*(R1+R2)
@@ -49,12 +215,84 @@ function multiplicity(con::T;Nr=100, Nth=50) where {T<:Participant}
     δθ=2pi/Nth
     r_range=range(δr/2,Rmax-δr/2,Nr)
     theta_range=range(0,2pi,Nth)
-    sum(Iterators.product(enumerate(r_range),enumerate(theta_range))) do ((ir,r),(iθ, θ))
-        s,c=sincos(θ) 
-        x=r*c
-        y=r*s
-        con(x,y)*r*δr*δθ
+    #sum(Iterators.product(enumerate(r_range),enumerate(theta_range))) do ((ir,r),(iθ, θ))
+    Δ=δr*δθ
+    mult=zero(eltype(con))
+    @fastmath for  θ in theta_range
+        s,c=sincos(θ)
+        @fastmath for r in r_range  
+            x=r*c
+            y=r*s
+            mesure=Δ*r
+            multiplicity=con(x,y)*mesure
+            mult +=multiplicity
+           
+        end 
     end 
+    return mult
+end
+
+"""
+    multiplicity_gl(con; Nr=64, Nth=64)
+
+Compute multiplicity using Gauss–Legendre quadrature in r and trapezoidal rule in θ.
+"""
+@inline function multiplicity_gl(con::T; Nr=64, Nth=64) where {T<:Participant}
+    multiplicity_gl!(con, prepare_accumulation(con, Nr, Nth))
+end
+
+"""
+    multiplicity_gl!(con, cache)
+
+Non-allocating variant for multiplicity using pre-computed cache.
+"""
+function multiplicity_gl!(con::T, cache) where {T<:Participant}
+    r_vals, r_weights, sinθ, cosθ = cache.r_vals, cache.r_weights, cache.sinθ, cache.cosθ
+
+    mult = zero(eltype(con))
+
+    @inbounds for j in eachindex(sinθ)
+        s, c = sinθ[j], cosθ[j]
+        @inbounds @simd for i in eachindex(r_vals)
+            r = r_vals[i]
+            w = r_weights[i]
+            x = r * c
+            y = r * s
+            mult += con(x, y) * w
+        end
+    end
+
+    return mult
+end
+
+"""
+    shift_and_compute(participant)
+
+Shift nucleon positions to the center of mass and return the shifted participant
+along with its multiplicity.
+
+# Arguments
+- `participant::Participant`: configuration to shift and evaluate.
+
+# Returns
+- `(Participant, multiplicity)`: shifted participant and its multiplicity.
+"""
+function shift_and_compute(participant::Participant)
+    mult_val, x_cm, y_cm = center_of_mass(participant)
+    if mult_val == 0
+        return participant, mult_val
+    end
+
+    shift_vec = SVector{2}(x_cm / mult_val, y_cm / mult_val)
+    r1_shifted = participant.part1 .- shift_vec
+    r2_shifted = participant.part2 .- shift_vec
+
+    shifted = Participant(r1_shifted, r2_shifted, participant.shape1, participant.shape2,
+                          participant.n_coll, participant.sub_nucleon_width, participant.shape_parameter,
+                          participant.p, participant.R1, participant.R2, participant.b)
+
+   
+    return shifted, mult_val
 end
 
 
@@ -73,16 +311,17 @@ Selects centralities from a vector of events.
 
 # Example
 """
-function centralities_selection_CoM(events::Vector{T},bins ;Threaded=true) where {T<:Participant}
+function centralities_selection_CoM(events::Vector{T},bins; Threaded=true ) where {T<:Participant}
     
     if Threaded 
         multi=tmap(events)   do x 
-            center_of_mass(x)
-        end
+           center_of_mass(x)
+       end
         mult=tmap(m->m[1],multi)
         #com1=tmap(m->m[2],multi)
         #com2=tmap(m->m[3],multi)
     else 
+
         multi=map(events)   do x 
             center_of_mass(x)
         end
@@ -92,7 +331,7 @@ function centralities_selection_CoM(events::Vector{T},bins ;Threaded=true) where
     end 
 
     event_perm=sortperm(mult,rev=true)
-    multiplicity_sorted=mult[event_perm]
+   # multiplicity_sorted=mult[event_perm]
     CoM_sorted=multi[event_perm]
     events_sorted=events[event_perm]
 
@@ -101,9 +340,12 @@ function centralities_selection_CoM(events::Vector{T},bins ;Threaded=true) where
     n_event_per_bin=Int(min_bias ÷ 100)
     realBinVals=n_event_per_bin*bins
 
-    centrality_borders=map(x->x[1],multiplicity_sorted[1:n_event_per_bin:min_bias])
+    #centrality_borders=map(x->x[1],multiplicity_sorted[1:n_event_per_bin:min_bias])
 
-    return split_vector_by_indices(events_sorted,realBinVals), split_vector_by_indices(CoM_sorted,realBinVals)
+    #return split_vector_by_indices(events_sorted,realBinVals), split_vector_by_indices(CoM_sorted,realBinVals)
+    batches= split_vector_by_indices(events_sorted,realBinVals)
+    CoM= split_vector_by_indices(CoM_sorted,realBinVals)
+    return batches, CoM
 
     #return centrality_borders
 end
@@ -164,8 +406,8 @@ function projectile_dictionary(massNumber)
     return dict[massNumber]
 end
 
-function split_vector_by_indices(vector, indices)
-    chunks = []
+function split_vector_by_indices_old(vector, indices)
+    chunks = empty(vector,eltype(vector))
     start_idx = 1
     for idx in indices
         push!(chunks, vector[start_idx:idx])
@@ -177,7 +419,23 @@ function split_vector_by_indices(vector, indices)
     return chunks
 end
 
+function split_vector_by_indices(vector, indices)
+    # Combine the start index (1) and all indices+1 as starting points,
+    # and all indices and the end index as ending points.
+    
+    # 1. Prepare all the index ranges.
+    # The start indices are 1 and all indices + 1
+    starts = vcat(1, indices .+ 1)
+    
+    # The end indices are all indices and the end of the vector
+    ends = vcat(indices, length(vector))
 
+    # 2. Use a generator/comprehension to create the chunks.
+    # This automatically infers the concrete type of the resulting vector.
+    chunks = [vector[s:e] for (s, e) in zip(starts, ends) if s <= e]
+    
+    return chunks
+end
 
 function generatingfunction(conf_part::Vector{T},h,r,step,CoMList) where {T<:Participant}
     #sumval=0.0
@@ -211,6 +469,7 @@ end
 
 
 function batched_events(Projectile1,Projectile2,w,k,p,sqrtS,bins;minBiasEvents=1000000,threaded=true)
+    ##TODO fix to get the x
     participants=Participants(Projectile1,Projectile2,w,x,k,p)
 
     if threaded
@@ -225,11 +484,15 @@ end
 
 
 
-function generate_background(f,norm,batches,CoM;r_grid=0:1:10,step=2pi/10)
+function generate_background(f,norm,batches,CoM;r_grid=0.:1.:10.,step=2pi/10)
     #batches, CoM=batched_events(Projectile1,Projectile2,w,k,p,sqrtS,bins;minBiasEvents=minBiasEvents)
-    finalRes=tmap(1:length(batches)-1) do i
+   # ex = DifferentiationInterface.gradient(x->log(generatingfunction(batches[1],x,r_grid,step,CoM[1])), AutoForwardDiff(), zeros(eltype(r_grid),length(r_grid),2))
+   # finalRes = zeros(Float64,length(batches)-1, length(r_grid), 2)
+    finalRes=map(1:length(batches)-1) do i
+        grad=zeros(eltype(r_grid),length(r_grid))
         #DifferentiationInterface.gradient(x->log(generatingfunction(batches[i],x,r_grid,step,CoM[i],f,norm)), AutoForwardDiff(), zeros(length(r_grid),2))
-        DifferentiationInterface.gradient(x->log(generatingfunction(batches[i],x,r_grid,step,CoM[i])), AutoForwardDiff(), zeros(length(r_grid),2))
+        DifferentiationInterface.gradient!(x->log(generatingfunction(batches[i],x,r_grid,step,CoM[i])),grad, AutoForwardDiff(), zeros(eltype(r_grid),length(r_grid),2))
+        return grad
     end
     return map(x->f.(-norm .*x[:,1]),finalRes)
 end
@@ -268,17 +531,30 @@ end
 
 
 function generate_2ptfct(norm,batches, CoM,mList;r_grid=0:1:10,step=2pi/50)
-    finalRes=stack(tmap(1:length(batches)-1) do i
-        map(m->DifferentiationInterface.hessian(x->log(generatingfunction_h(batches[i],x,r_grid,step,CoM[i],m,norm)), AutoForwardDiff(), zeros(length(r_grid),2)),mList)
-    end)
+    finalRes=stack(map(1:length(batches)-1) do i
+        hess=zeros(eltype(r_grid),2*length(r_grid),2*length(r_grid))
+        map(m->DifferentiationInterface.hessian!(x->log(generatingfunction_h(batches[i],x,r_grid,step,CoM[i],m,norm)),hess, AutoForwardDiff(), zeros(eltype(r_grid),length(r_grid),2)),mList)
+        return hess
+    end)####From here on it is not type stable anymore
     hessianTransform=map(m->map(cc->reshape(finalRes[m,cc],(length(r_grid),2,length(r_grid),2)),1:length(batches)-1),1:length(mList))
     rIndeces=Iterators.product(1:length(r_grid),1:length(r_grid))
     twoPtFct=map(m->map(cc->map(rr->FT(hessianTransform[m][cc][rr[1],:,rr[2],:]),rIndeces),1:length(batches)-1),1:length(mList))
     return twoPtFct
 end
 
+function generate_2ptfct_all(norm,batches,CoM,mList;r_grid=0:1:10,step=2pi/50)
+    res=zeros(ComplexF64,length(mList),length(CoM)-1,length(r_grid),length(r_grid))
+    map(1:length(batches)-1) do cc
+        map(1:length(mList)) do m
+            res[m,cc,:,:]=generate_2ptfct(norm,batches,CoM,mList[m],cc;r_grid=r_grid,step=step)
+        end
+    end
+    return res
+end
+
 function generate_2ptfct(norm,batches,CoM,m::Int,cc::Int;r_grid=0:1:10,step=2pi/50)
-    finalRes=DifferentiationInterface.hessian(x->log(generatingfunction_h(batches[cc],x,r_grid,step,CoM[cc],m,norm)), AutoForwardDiff(), zeros(length(r_grid),2))
+    hess=zeros(eltype(r_grid),2*length(r_grid),2*length(r_grid))
+    finalRes=DifferentiationInterface.hessian!(x->log(generatingfunction_h(batches[cc],x,r_grid,step,CoM[cc],m,norm)),hess, AutoForwardDiff(), zeros(eltype(r_grid),length(r_grid),2))
     hessianTransform=reshape(finalRes,(length(r_grid),2,length(r_grid),2))
     rIndeces=Iterators.product(1:length(r_grid),1:length(r_grid))
     twoPtFct=map(rr->FT(hessianTransform[rr[1],:,rr[2],:]),rIndeces)
@@ -298,7 +574,7 @@ function generate_bg_two_pt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,
     #end
     batches, CoM=centralities_selection_CoM(events,bins;Threaded=Threaded)
     bg=generate_background(f,norm,batches,CoM,r_grid=r_grid,step=step)
-    twoPtFct_entropy=generate_2ptfct(norm,batches, CoM,mList;r_grid=r_grid,step=step)
+    twoPtFct_entropy=generate_2ptfct_all(norm,batches, CoM,mList;r_grid=r_grid,step=step)
     #@show  size(twoPtFct_entropy[1][1][1]),size(twoPtFct_entropy[1]),size(twoPtFct_entropy[1]),size(twoPtFct_entropy)
     twoPtFct=map(m->map(cc->map(r1->map(r2->twoPtFct_entropy[m][cc][r1,r2]*delta_factor(bg[cc][r1])*delta_factor(bg[cc][r2]),1:length(r_grid)),1:length(r_grid)),1:length(bg)),1:length(mList))
     #twoPtFct=map(m->map(cc->map(r1->map(r2->twoPtFct_entropy[m][cc][r1][r2],1:length(r_grid)),1:length(r_grid)),1:length(bg)),1:length(mList))
@@ -322,7 +598,7 @@ function generate_bg(f,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins;minBiasEven
     #batches, CoM=batched_events(Projectile1,Projectile2,w,k,p,sqrtS,bins;minBiasEvents=minBiasEvents)
     participants=Participants(Projectile1,Projectile2,w,sqrtS,k,p)
     #if threaded
-     events=rand(threaded(participants),minBiasEvents)
+    events=rand(threaded(participants),minBiasEvents)
     #else
     #    events=rand(participants,minBiasEvents)
     #end
@@ -340,7 +616,7 @@ function save_bg_two_pt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sq
     #end
     batches, CoM=centralities_selection_CoM(events,bins;Threaded=Threaded)
     bg=generate_background(f,norm,batches,CoM,r_grid=r_grid,step=step)
-    twoPtFct_entropy=generate_2ptfct(norm,batches, CoM,mList;r_grid=r_grid,step=step)
+    twoPtFct_entropy=generate_2ptfct_all(norm,batches, CoM,mList;r_grid=r_grid,step=step)
     twoPtFct=map(m->map(cc->map(r1->map(r2->twoPtFct_entropy[m][cc][r1,r2]*delta_factor(bg[cc][r1])*delta_factor(bg[cc][r2]),1:length(r_grid)),1:length(r_grid)),1:length(bg)),1:length(mList))
     bgString,twoptString=construct_trento_names(participants;extensionString="dat",mMode="2")
     writedlm(bgString,bg)
@@ -428,9 +704,9 @@ function generate_bg_two_pt_fct_save(f,delta_factor,norm,Projectile1,Projectile2
     return bg,finalCorr;
 end
 
-function generate_bg_two_pt_fct_save_faster(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins,mList;minBiasEvents=1000,r_grid=0:1:10,step=2pi/20,Threaded=true,n_ext_Grid=0,nFields=10,
-    extensionString="dat",path="./",override_files=false)
-
+function generate_bg_two_pt_fct_save_faster(f,delta_factor,norm::Float64,Projectile1::NucleiWoodSaxon3D,Projectile2::NucleiWoodSaxon3D,w::Float64,k::Float64,p::Float64,sqrtS::Float64,bins::Vector{Int64},mList::Vector{Int64};minBiasEvents::Int=1000,r_grid=0:1.:10,step::Float64=2pi/20,Threaded::Bool=true,n_ext_Grid::Int=0,nFields::Int=10,
+    extensionString::String="dat",path::String="./",override_files::Bool=false)
+ 
     # Basic validation
     if (length(bins) + 1) * 100 > minBiasEvents
         error("Not enough events for number of bins, increase minBiasEvents")
@@ -439,8 +715,8 @@ function generate_bg_two_pt_fct_save_faster(f,delta_factor,norm,Projectile1,Proj
     # Initialize participant system and arrays
     participants = Participants(Projectile1, Projectile2, w, sqrtS, k, p)
     nGrid = max(length(r_grid), n_ext_Grid)
-    finalCorr = zeros(length(bins), 2, nFields, nFields, length(mList), nGrid, nGrid)
-    bg = zeros(length(bins), nGrid)
+    finalCorr = zeros(eltype(r_grid),length(bins), 2, nFields, nFields, length(mList), nGrid, nGrid)
+    bg = zeros(eltype(r_grid),length(bins), nGrid)
 
     # Loop over all bins
     for cc in eachindex(bins)
@@ -468,10 +744,10 @@ function generate_bg_two_pt_fct_save_faster(f,delta_factor,norm,Projectile1,Proj
             for r1 in 1:length(r_grid)
                 bg[cc,r1]=bg_small_grid[r1]
             end
-            writedlm(bgString,bg)
+            writedlm(bgString,bg[cc,:])
 
             # Generate two-point correlation functions
-            for i in eachindex(mList)
+          @inbounds  for i in eachindex(mList)
                 _, twoptString = construct_trento_names(
                     participants;
                     extensionString = extensionString,
@@ -481,20 +757,21 @@ function generate_bg_two_pt_fct_save_faster(f,delta_factor,norm,Projectile1,Proj
                 )
 
                  twoPtFct_entropy=generate_2ptfct(norm,batches,CoM,mList[i],cc;r_grid=r_grid,step=step)
-                twoPtFct=map(r1->map(r2->twoPtFct_entropy[r1,r2]*delta_factor(bg[r1])*delta_factor(bg[r2]),1:length(r_grid)),1:length(r_grid))
-                for r1 in 1:length(r_grid)
-                    for r2 in 1:length(r_grid)
+                twoPtFct=map(r1->map(r2->twoPtFct_entropy[r1,r2]*delta_factor(bg_small_grid[r1])*delta_factor(bg_small_grid[r2]),1:length(r_grid)),1:length(r_grid))
+                @inbounds for r1 in 1:length(r_grid)
+                    @inbounds for r2 in 1:length(r_grid)
                         finalCorr[cc,1,1,1,i,r1,r2]=real(twoPtFct[r1][r2])
                     end
                 end
                 writedlm(twoptString,finalCorr[cc,1,1,1,i,:,:])
+                
             end
 
         else
             # =====================================
             # READ EXISTING FILES ONLY
             # =====================================
-            bg[cc, :] = collect(readdlm(bgString))
+            bg[cc, :] = collect(readdlm(bgString,eltype(r_grid)))
 
             for i in eachindex(mList)
                 _, twoptString = construct_trento_names(
@@ -504,12 +781,13 @@ function generate_bg_two_pt_fct_save_faster(f,delta_factor,norm,Projectile1,Proj
                     cc = string(lb) * "-" * string(rb),
                     path = path
                 )
-                finalCorr[cc, 1, 1, 1, i, :, :] = collect(readdlm(twoptString))
+                finalCorr[cc, 1, 1, 1, i, :, :] = collect(readdlm(twoptString,eltype(r_grid)))
             end
         end
     end
 
     return bg, finalCorr
+    
 end
 
 
