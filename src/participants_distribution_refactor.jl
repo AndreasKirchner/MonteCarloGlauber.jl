@@ -67,7 +67,7 @@ function fluctuating_thickness(x::Num1,y::Num2,f::Participant{T,S,V,M,C,D,F} ) w
     @inbounds @fastmath for i in eachindex(part1)
         pa_x,pa_y=part1[i]
         ga=shape1[i]
-        ta+=ga*Tp(x-pa_x,y-pa_y,w)
+        ta+=ga*Tp(x-pa_x,y-pa_y,w) #TODO check this shift
     end
     
     @inbounds @fastmath for i in eachindex(part2)

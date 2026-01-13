@@ -79,14 +79,45 @@ function prepare_accumulation(con::T, Nr=64, Nth=64) where {T<:Participant}
     
     # Pre-map nodes to [0, Rmax] and compute full weights (Jacobian * r * Δθ)
     r_vals = (r_nodes .+ 1) .* half_R
-    r_weights = r_w .* half_R .* r_vals .* Δθ
+    r_weights = r_w .* half_R .* r_vals 
     
     # Pre-compute sin/cos for all θ values
     θ_vals = [(j * Δθ) for j in 0:(Nth-1)]
     sinθ = sin.(θ_vals)
     cosθ = cos.(θ_vals)
+
+    θ_weight = fill(Δθ,Nth)
     
-    return (r_vals=r_vals, r_weights=r_weights, sinθ=sinθ, cosθ=cosθ)
+    return (r_vals=r_vals, r_weights=r_weights, sinθ=sinθ, cosθ=cosθ, θ_weight=θ_weight)
+end
+
+function prepare_accumulation2(con::T, Nr=64, Nth=64) where {T<:Participant}
+    Rmax = 3 * (con.R1 + con.R2)
+    half_R = Rmax / 2
+    Δθ = 2pi / Nth
+    
+    # 1. Obtain standard nodes and weights
+    r_nodes, r_w = FastGaussQuadrature.gausslegendre(Nr)
+    
+    # 2. Map nodes to [0, Rmax]
+    r_vals = (r_nodes .+ 1) .* half_R
+    
+    # 3. Compute weights: (dr scaling) * (Jacobian r) * (dθ)
+    # This allows you to simply sum f(r, θ) * weight
+    combined_r_weights = r_w .* half_R .* r_vals .* Δθ
+    
+    # 4. θ values and trig pre-computation
+    # Using range 0:Nth-1 is correct for trapezoidal/periodic
+    θ_vals = (0:Nth-1) .* Δθ
+    sinθ = sin.(θ_vals)
+    cosθ = cos.(θ_vals)
+    
+    return (
+        r_vals = r_vals, 
+        r_weights = combined_r_weights, # Total weight per radial node
+        sinθ = sinθ, 
+        cosθ = cosθ
+    )
 end
 
 # Legacy version for backward compatibility
@@ -107,7 +138,7 @@ Non-allocating variant using pre-computed cache from `prepare_accumulation(con, 
 - `(mult, x_cm, y_cm)`: Multiplicity and first moments.
 """
 function center_of_mass_gl!(con::T, cache) where {T<:Participant}
-    r_vals, r_weights, sinθ, cosθ = cache.r_vals, cache.r_weights, cache.sinθ, cache.cosθ
+    r_vals, r_weights, sinθ, cosθ, θ_weight = cache.r_vals, cache.r_weights, cache.sinθ, cache.cosθ, cache.θ_weight
 
     mult = zero(eltype(con))
     x_cm = zero(eltype(con))
@@ -115,12 +146,13 @@ function center_of_mass_gl!(con::T, cache) where {T<:Participant}
 
     @inbounds for j in eachindex(sinθ)
         s, c = sinθ[j], cosθ[j]
+        w_θ = θ_weight[j]
         @inbounds @simd for i in eachindex(r_vals)
             r = r_vals[i]
             w = r_weights[i]
             x = r * c
             y = r * s
-            m = con(x, y) * w
+            m = con(x, y) * w * w_θ
             mult += m
             x_cm += m * x
             y_cm += m * y

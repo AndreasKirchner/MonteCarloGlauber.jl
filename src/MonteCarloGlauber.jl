@@ -16,6 +16,7 @@ using Interpolations
 using Base.Threads
 using DelimitedFiles
 using HDF5
+using FastGaussQuadrature
 
 
 

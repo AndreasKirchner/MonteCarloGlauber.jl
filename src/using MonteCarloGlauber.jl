@@ -853,3 +853,341 @@ rand(event,100)
     @test eltype(ee) == Float64
     @test size(ff) == (10,2)
     @test eltype(ff) == Float64 
+
+
+using Fluidum
+using MonteCarloGlauber
+using Plots
+
+#INITIAL CONDITIONS
+n1= Lead()
+n2= Lead()
+w= 0.5
+s_NN=5000.
+k=1.
+p=0.
+Norm = 50.
+eos= FluiduMEoS()
+centrality_bins=[5,10,20,30]
+mlist = [2,3]
+
+entropy(T)=T#pressure_derivative(T,Val(1),eos) #entropy as function of temperature
+entropyToTemp(T)=T#InverseFunction(entropy)(T) #inverse, i.e. T(s)
+dSdT(T)=T#pressure_derivative(T,Val(2),eos) #function to convert perturbations as function of bg temp, i.e. dT/ds(T_0)
+dSdTinverse(T) =T# 1/dSdT(T)
+bg,twpt=MonteCarloGlauber.generate_bg_two_pt_fct_save_faster(entropyToTemp,dSdTinverse,Norm,n1,n2,w,k,p,s_NN,centrality_bins,mlist;minBiasEvents=1000,r_grid=0:0.2:15,n_ext_Grid=100,override_files=true,path="./")
+
+using QuadGK
+using Statistics
+
+function variance(configuration,r_1,r_2,m)
+   mean(configuration) do conf
+        integral,er= quadgk( 0, 2pi, rtol=1e-3) do θ_1 
+            result, error =quadgk( 0, 2pi, rtol=1e-3) do θ_2
+                x_1= r_1 *cos(θ_1) 
+                y_1= r_1 *sin(θ_1) 
+                x_2= r_2 *cos(θ_2)
+                y_2= r_2 *sin(θ_2)
+            conf(x_1,y_1)*conf(x_2,y_2)*exp(im*m*(θ_1-θ_2))
+            end 
+        return result
+        end 
+    return integral
+   end 
+end 
+
+function variance_at(configuration,r_1,r_2,m,len)
+    mean(configuration) do conf
+        mean(range(0,2pi,len)) do θ_1  
+            mean(range(0,2pi,len)) do θ_2
+                x_1= r_1 *cos(θ_1) 
+                y_1= r_1 *sin(θ_1) 
+                x_2= r_2 *cos(θ_2)
+                y_2= r_2 *sin(θ_2)
+            conf(x_1,y_1)*conf(x_2,y_2)*exp(im*m*(θ_1-θ_2))
+            end 
+        end    
+   end 
+end 
+
+function variance_at_2(configuration,r_1,r_2,m,len)
+    result= zero(first(configuration)(r_1,r_2)*im)
+    nevnet=length(configuration)
+    θrange= range(0,2pi,len)
+    for i_conf in eachindex(configuration)
+        sums=zero(result)
+            for θ_1 in θrange
+                x_1= r_1 *cos(θ_1) 
+                y_1= r_1 *sin(θ_1) 
+                c_1=configuration[i_conf](x_1,y_1)
+                for θ_2 in θrange
+                    x_2= r_2 *cos(θ_2)
+                    y_2= r_2 *sin(θ_2)
+                    c_2=configuration[i_conf](x_2,y_2)
+                    sums+= c_1*c_2*exp(im*m*(θ_1-θ_2))
+                end 
+            end 
+        result += sums
+    end 
+   return result/(nevnet*len*len)
+end 
+
+
+
+function mean_at(configuration,r_1,m,len)
+    mean(configuration) do conf
+        mean(range(0,2pi,len)) do θ_1
+                x_1= r_1 *cos(θ_1) 
+                y_1= r_1 *sin(θ_1) 
+            conf(x_1,y_1)exp(im*m*(θ_1))
+        end  
+    end 
+end
+
+
+function cumulant_at(configuration,r_1,r_2,m,len)
+    variance_at(configuration,r_1,r_2,m,len) - mean_at(configuration,r_1,m,len)*conj( mean_at(configuration,r_2,m,len))
+end
+
+participants=Participants(n1,n2,w,s_NN,k,p)
+
+ddd=rand(participants,100)
+
+variance_at(ddd,1,1,0,20)
+
+variance_at(ddd,2,1,0,20)
+variance_at(ddd,1,2,0,20)
+
+variance_at(ddd,1,1,0,20)
+variance_at_2(ddd,1,1,0,20)
+
+rgrid=0:1:10
+
+resListBG=mean_at.(Ref(ddd),rgrid,Ref(0),Ref(20))
+
+res=map(rgrid) do r1
+    map(rgrid) do r2
+        cumulant_at(ddd,r1,r2,0,20)
+    end
+end
+
+heatmap(real.(res))
+
+resi=stack(real.(res))
+heatmap(resi)
+
+size(resi)
+
+plot(rgrid,real.(resListBG))
+
+mean_at(ddd,1,0,10)
+cumulant_at(ddd,1,1,0,15)
+
+
+using BenchmarkTools
+
+@benchmark variance_at_2($ddd,1,1,0,15)
+
+@code_warntype variance_at_2(ddd,1,1,0,15)
+
+100*23 * 10_000/2 /60/60
+
+function second_cumulant(configuration,r_1,r_2,m,len)
+    result= zero(first(configuration)(r_1,r_2)im)
+    result_av=zero(result)
+    nevnet=length(configuration)
+    θrange= range(0,2pi,len)
+    for i_conf in eachindex(configuration)
+        @inbounds conf=configuration[i_conf]
+        sums=zero(result)
+        sumaverege=zero(result)
+            for θ_1 in θrange
+                s1,c1=sincos(θ_1)
+                x_1= r_1*s1
+                y_1= r_1*c1 
+                c_1=conf(x_1,y_1)
+                sfirst,cfirst=sincos(m*θ_1)
+                #firstfactor=c_1*(sfirst+im*cfirst)
+                firstfactor=c_1*(cfirst+im*sfirst)
+                sumaverege+= firstfactor
+                for θ_2 in θrange
+                    s2,c2=sincos(θ_2)
+                    x_2= r_2*s2
+                    y_2= r_2*c2 
+                    c_2=conf(x_2,y_2)
+                    sdiff,cdiff=sincos(m*(θ_2))
+                    sums+= c_2*(cdiff-im*sdiff)*firstfactor
+                end 
+            end 
+        result += sums
+        result_av+=sumaverege
+    end 
+   return (result-abs2(result_av)/nevnet)/(nevnet*len*len)
+end
+
+ddd=rand(participants,500)
+second_cumulant(ddd,1.2,1,0,20)
+cumulant_at(ddd,1.2,1,0,20)
+
+using BenchmarkTools
+@benchmark second_cumulant(ddd,2,1,0,15)
+@benchmark cumulant_at(ddd,2,1,0,15)
+
+rgrid=0:1:10
+
+res=map(rgrid) do r1
+    map(rgrid) do r2
+        second_cumulant(ddd,r1,r2,3,20)
+    end
+end
+
+second_cumulant(ddd,2,1,2,5)
+second_cumulant(ddd,2,1,2,10)
+second_cumulant(ddd,2,1,2,15)
+second_cumulant(ddd,2,1,2,20)
+second_cumulant(ddd,2,1,2,25)
+second_cumulant(ddd,2,1,2,30)
+second_cumulant(ddd,2,1,2,60)
+second_cumulant(ddd,2,1,2,100)
+
+
+second_cumulant(ddd,1,1,2,5)
+second_cumulant(ddd,1,1,2,10)
+second_cumulant(ddd,1,1,2,15)
+second_cumulant(ddd,1,1,2,20)
+second_cumulant(ddd,1,1,2,25)
+second_cumulant(ddd,1,1,2,30)
+second_cumulant(ddd,1,1,2,60)
+second_cumulant(ddd,1,1,2,400)
+
+0.02039/0.0212916
+
+resi=stack(real.(res))
+heatmap(resi)
+
+
+
+function second_cumulant(configuration,r_1,r_2,m,norm,len)
+    result= zero(first(configuration)(r_1,r_2)im)
+    result_av=zero(result)
+    nevnet=length(configuration)
+    θrange= range(0,2pi,len)
+    for i_conf in eachindex(configuration)
+        @inbounds conf=configuration[i_conf]
+        sums=zero(result)
+        sumaverege=zero(result)
+            for θ_1 in θrange
+                s1,c1=sincos(θ_1)
+                x_1= r_1*s1
+                y_1= r_1*c1 
+                c_1=norm*conf(x_1,y_1)
+                sfirst,cfirst=sincos(m*θ_1)
+                #firstfactor=c_1*(sfirst+im*cfirst)
+                firstfactor=c_1*(cfirst+im*sfirst)
+                sumaverege+= firstfactor
+                for θ_2 in θrange
+                    s2,c2=sincos(θ_2)
+                    x_2= r_2*s2
+                    y_2= r_2*c2 
+                    c_2=norm*conf(x_2,y_2)
+                    sdiff,cdiff=sincos(m*(θ_2))
+                    sums+= c_2*(cdiff-im*sdiff)*firstfactor
+                end 
+            end 
+        result += sums
+        result_av+=sumaverege
+    end 
+   return (result-abs2(result_av)/nevnet)/(nevnet*len*len)
+end
+
+second_cumulant(ddd,1.2,1,0,1,20)
+second_cumulant(ddd,1.2,1,0,1,10)
+second_cumulant(ddd,1.2,1,0,1,200)
+second_cumulant(ddd,1,1,0,1,20)
+
+using MonteCarloGlauber
+aa=MonteCarloGlauber.prepare_accumulation(ddd[2])
+aa2=MonteCarloGlauber.prepare_accumulation2(ddd[1])
+MonteCarloGlauber.center_of_mass_gl!(ddd[2],aa)
+
+0.029/0.104
+
+MonteCarloGlauber.center_of_mass(ddd[2])
+0.032/0.108
+
+zeros(eltype(rgrid),length(rgrid),length(rgrid))
+
+function generate_tw_pt_fct(configuration,r_grid,m,norm,len)
+    correlator=zeros(eltype(r_grid),length(r_grid),length(r_grid))
+    for i1=1:length(r_grid)
+        r1=r_grid[i1]
+       for i2=i1:length(r_grid)
+            r2=r_grid[i2]
+            correlator[i1,i2]= real(second_cumulant(configuration,r1,r2,m,norm,len))
+            correlator[i2,i1]=correlator[i1,i2]
+       end
+    end
+    return correlator
+end
+
+#dims final correlator
+#cc, reim, field, field, m ,r1,r2
+
+
+#1 sort profiles in cc
+#2 get bg and two fct with norm
+#3 apply Eos(bg) and dt/ds*twoPtFct
+#4 put in matrix
+
+function generate_bg(events,bins,r_grid,EoS;NumPhiPoints=20)
+
+    batches, CoM=centralities_selection_CoM(events,bins;Threaded=Threaded)
+
+
+end
+
+
+@code_warntype generate_tw_pt_fct(ddd,0.0:1:3,2,1,20)
+@code_warntype generate_tw_pt_fct(ddd,0.0:1:6,2,1,20)
+@benchmark generate_tw_pt_fct(ddd,0.0:1:3,2,1,20)
+@benchmark generate_tw_pt_fct(ddd,0.0:1:6,2,1,20)
+
+length(0:1:3)
+length(0:1:6)
+
+length(ddd)
+
+4*5/2
+7*8/2
+
+
+ddd[1]
+
+MonteCarloGlauber.center_of_mass(ddd[1])
+0.03/0.108
+
+a,b=MonteCarloGlauber.centralities_selection_CoM(ddd,[0,10])
+
+a
+b[1]
+
+b[1][1][2]/b[1][1][1]
+b[1][1][3]/b[1][1][1]
+ddd[1](1,1)
+
+MonteCarloGlauber.fluctuating_thickness(1,1,ddd[1])
+
+b[1][10][2]/b[1][10][1]
+b[1][10][3]/b[1][10][1]
+
+a=generate_tw_pt_fct(ddd,0:0.2:10.,2,1,20)
+
+heatmap(a)
+
+event=rand(participants,10)
+profile=map(event)   do x 
+    map(Iterators.product(-10:0.5:10,-10:0.5:10)) do y
+        x(y...)
+    end
+end
+heatmap(-10:0.5:10,-10:0.5:10,profile[7])
