@@ -1150,11 +1150,11 @@ using Plots
 
 participants=Participants(n1,n2,w,s_NN,k,p)
 
-ddd=rand(participants,1000)
+ddd=rand(participants,10000)
 
-function generate_bg(events,bins,r_grid,EoS;NumPhiPoints=20,Threaded=true)
+function generate_bg(events,bins,r_grid,InverseEoS,Norm;NumPhiPoints=20,Threaded=true)
     bg=zeros(eltype(r_grid),length(bins)+1,length(r_grid))
-    batches, CoM=MonteCarloGlauber.centralities_selection_CoM(events,bins;Threaded=Threaded)
+    batches=MonteCarloGlauber.centralities_selection_events(events,bins;Threaded=Threaded)
     for cc_batches in eachindex(batches)
         for r_i in eachindex(r_grid)
             r=r_grid[r_i]
@@ -1163,19 +1163,47 @@ function generate_bg(events,bins,r_grid,EoS;NumPhiPoints=20,Threaded=true)
 
         end
     end
-    return bg
+    return InverseEoS.(Norm .*bg)
 
 end
 
+function generate_tw_pt_fct_entropy(events,bins,r_grid,m_list,Norm;NumPhiPoints=20,Threaded=true,Nfields=10)
+    finalCorrelator=zeros(eltype(r_grid),length(bins),2,Nfields,Nfields,length(m_list),length(r_grid),length(r_grid))
+    batches=MonteCarloGlauber.centralities_selection_events(events,bins;Threaded=Threaded)
+    for cc in 1:length(batches)-1
+        for m in 1:length(m_list)
+            for r1 in 1:length(r_grid)
+                for r2 in r1:length(r_grid)
+                    finalCorrelator[cc,1,1,1,m,r1,r2]=real.(second_cumulant(batches[cc],r_grid[r1],r_grid[r2],m_list[m],Norm,NumPhiPoints))
+                    finalCorrelator[cc,1,1,1,m,r2,r1]=finalCorrelator[cc,1,1,1,m,r1,r2]
+                end
+            end
+        end
+    end
+    return finalCorrelator
+end
+
+second_cumulant(ddd,1,1,2,100,20)
+
+fun(T)=T^6
 length(0.:0.1:10)
-a=generate_bg(ddd,[10,20],0.:0.1:10,1)
+ddd=rand(participants,100)
+a=generate_bg(ddd,[10,20],0.:1:10,fun,2)
 plot(a[1,:])
 plot!(a[2,:])
 plot!(a[3,:])
 
+b=generate_tw_pt_fct_entropy(ddd,[10,20],0.:0.1:10,[2,3],10)
+
+heatmap(b[1,1,1,1,2,:,:])
+
 using BenchmarkTools
 @code_warntype generate_bg(ddd,[10,20],0.:0.1:10,1)
-@benchmark generate_bg(ddd,[10,20],0.:0.1:10,1)
+@benchmark generate_bg($ddd,[10,20],0.:0.1:10,1)
+
+@code_warntype generate_tw_pt_fct_entropy(ddd,[10,20],0.:1:5,[2,3],10)
+@benchmark generate_tw_pt_fct_entropy(ddd,[10,20],0.:1:5,[2,3],10)
+
 
 @code_warntype generate_tw_pt_fct(ddd,0.0:1:3,2,1,20)
 @code_warntype generate_tw_pt_fct(ddd,0.0:1:6,2,1,20)
