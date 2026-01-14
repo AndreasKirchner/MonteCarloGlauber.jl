@@ -932,7 +932,7 @@ function variance_at_2(configuration,r_1,r_2,m,len)
    return result/(nevnet*len*len)
 end 
 
-
+using Statistics
 
 function mean_at(configuration,r_1,m,len)
     mean(configuration) do conf
@@ -1106,6 +1106,11 @@ second_cumulant(ddd,1.2,1,0,1,200)
 second_cumulant(ddd,1,1,0,1,20)
 
 using MonteCarloGlauber
+
+participants=Participants(n1,n2,w,s_NN,k,p)
+
+ddd=rand(participants,100)
+
 aa=MonteCarloGlauber.prepare_accumulation(ddd[2])
 aa2=MonteCarloGlauber.prepare_accumulation2(ddd[1])
 MonteCarloGlauber.center_of_mass_gl!(ddd[2],aa)
@@ -1139,13 +1144,38 @@ end
 #3 apply Eos(bg) and dt/ds*twoPtFct
 #4 put in matrix
 
-function generate_bg(events,bins,r_grid,EoS;NumPhiPoints=20)
+using MonteCarloGlauber
+using Plots
 
-    batches, CoM=centralities_selection_CoM(events,bins;Threaded=Threaded)
 
+participants=Participants(n1,n2,w,s_NN,k,p)
+
+ddd=rand(participants,1000)
+
+function generate_bg(events,bins,r_grid,EoS;NumPhiPoints=20,Threaded=true)
+    bg=zeros(eltype(r_grid),length(bins)+1,length(r_grid))
+    batches, CoM=MonteCarloGlauber.centralities_selection_CoM(events,bins;Threaded=Threaded)
+    for cc_batches in eachindex(batches)
+        for r_i in eachindex(r_grid)
+            r=r_grid[r_i]
+            #@show cc_batches r_i
+            bg[cc_batches,r_i]= real.(mean_at(batches[cc_batches],r,0,NumPhiPoints))
+
+        end
+    end
+    return bg
 
 end
 
+length(0.:0.1:10)
+a=generate_bg(ddd,[10,20],0.:0.1:10,1)
+plot(a[1,:])
+plot!(a[2,:])
+plot!(a[3,:])
+
+using BenchmarkTools
+@code_warntype generate_bg(ddd,[10,20],0.:0.1:10,1)
+@benchmark generate_bg(ddd,[10,20],0.:0.1:10,1)
 
 @code_warntype generate_tw_pt_fct(ddd,0.0:1:3,2,1,20)
 @code_warntype generate_tw_pt_fct(ddd,0.0:1:6,2,1,20)
