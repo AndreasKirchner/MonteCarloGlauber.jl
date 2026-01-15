@@ -1207,15 +1207,37 @@ function generate_bg_twpt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,
     end
     return bg,correlator 
 end
-
+using Statistics
 k
-a10,b10=generate_bg_twpt_fct(entropyToTemp,dSdTinverse,30,n1,n2,w,10,p,s_NN,[1],[2,3];minBiasEvents=5000,r_grid=0.:0.5:10)
-a1,b1=generate_bg_twpt_fct(entropyToTemp,dSdTinverse,30,n1,n2,w,1,p,s_NN,[1],[2,3];minBiasEvents=5000,r_grid=0.:0.5:10)
-a01,b01=generate_bg_twpt_fct(entropyToTemp,dSdTinverse,30,n1,n2,w,0.1,p,s_NN,[1],[2,3];minBiasEvents=5000,r_grid=0.:0.5:10)
+a10,b10=generate_bg_twpt_fct(entropyToTemp,dSdTinverse,30,n1,n2,w,10,p,s_NN,[10],[2,3];minBiasEvents=500,r_grid=0.:1:20)
+a1,b1=generate_bg_twpt_fct(entropyToTemp,dSdTinverse,30,n1,n2,w,1,p,s_NN,[10],[2,3];minBiasEvents=500,r_grid=0.:1:20)
+a01,b01=generate_bg_twpt_fct(entropyToTemp,dSdTinverse,30,n1,n2,w,0.1,p,s_NN,[10],[2,3];minBiasEvents=500,r_grid=0.:1:20)
 
+heatmap(b10[1,1,1,1,1,:,:])
+heatmap(b10[1,1,1,1,1,1:6,1:6])
+
+exponential_tail_pointlike(function_profile,x;xmax = 8, offset = 0.015)
+temperature_funct = linear_interpolation(r, temperature_profile; extrapolation_bc=Flat()) #from 9.9 fm it's flat
+
+temp_exp = exponential_tail_pointlike.(Ref(temperature_funct), radius; xmax = x_max_x, offset = offset_x)
+
+
+plot(a10[1,:])
+plot(dSdTinverse.(a10[1,:]))
+minimum(a10[1,:])
+
+# small k -> large flucts
 sqrt(maximum(b10[1,1,1,1,1,:,:]))/maximum(a10[1,:])
 sqrt(maximum(b1[1,1,1,1,1,:,:]))/maximum(a1[1,:])
 sqrt(maximum(b01[1,1,1,1,1,:,:]))/maximum(a01[1,:])
+
+sqrt(b10[1,1,1,1,2,5,5])/a10[1,5]
+sqrt(b1[1,1,1,1,2,5,5])/a1[1,5]
+sqrt(b01[1,1,1,1,2,5,5])/a01[1,5]
+
+
+
+1/sqrt(50)
 
 sqrt(-minimum(b10[1,1,1,1,1,:,:]))/maximum(a10[1,:])
 sqrt(-minimum(b1[1,1,1,1,1,:,:]))/maximum(a1[1,:])
@@ -1227,7 +1249,7 @@ plot!(a01[1,:])
 
 plot(heatmap(b[1,1,1,1,1,1:30,1:30]),heatmap(b[2,1,1,1,1,1:30,1:30]),heatmap(b[1,1,1,1,2,1:30,1:30]),heatmap(b[2,1,1,1,2,1:30,1:30]))
 
-heatmap(b[1,1,1,1,1,1:30,1:30])
+heatmap(b10[1,1,1,1,1,:,:])
 
 
 plot(b[1,1,1,1,1,1,1:20])
