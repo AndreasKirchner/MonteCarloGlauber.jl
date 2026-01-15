@@ -871,10 +871,10 @@ eos= FluiduMEoS()
 centrality_bins=[5,10,20,30]
 mlist = [2,3]
 
-entropy(T)=T#pressure_derivative(T,Val(1),eos) #entropy as function of temperature
-entropyToTemp(T)=T#InverseFunction(entropy)(T) #inverse, i.e. T(s)
-dSdT(T)=T#pressure_derivative(T,Val(2),eos) #function to convert perturbations as function of bg temp, i.e. dT/ds(T_0)
-dSdTinverse(T) =T# 1/dSdT(T)
+entropy(T)=pressure_derivative(T,Val(1),eos) #entropy as function of temperature
+entropyToTemp(T)=InverseFunction(entropy)(T) #inverse, i.e. T(s)
+dSdT(T)=pressure_derivative(T,Val(2),eos) #function to convert perturbations as function of bg temp, i.e. dT/ds(T_0)
+dSdTinverse(T) = 1/dSdT(T)
 bg,twpt=MonteCarloGlauber.generate_bg_two_pt_fct_save_faster(entropyToTemp,dSdTinverse,Norm,n1,n2,w,k,p,s_NN,centrality_bins,mlist;minBiasEvents=1000,r_grid=0:0.2:15,n_ext_Grid=100,override_files=true,path="./")
 
 using QuadGK
@@ -1151,11 +1151,11 @@ using Plots
 participants=Participants(n1,n2,w,s_NN,k,p)
 
 ddd=rand(participants,10000)
-
-function generate_bg(events,bins,r_grid,InverseEoS,Norm;NumPhiPoints=20,Threaded=true)
-    bg=zeros(eltype(r_grid),length(bins)+1,length(r_grid))
-    batches=MonteCarloGlauber.centralities_selection_events(events,bins;Threaded=Threaded)
-    for cc_batches in eachindex(batches)
+batches=MonteCarloGlauber.centralities_selection_events(ddd,[10,20])
+function generate_bg(batches,bins,r_grid,InverseEoS,Norm;NumPhiPoints=20,Threaded=true)
+    bg=zeros(eltype(r_grid),length(bins),length(r_grid))
+    #batches=MonteCarloGlauber.centralities_selection_events(events,bins;Threaded=Threaded)
+    for cc_batches in 1:length(batches)-1
         for r_i in eachindex(r_grid)
             r=r_grid[r_i]
             #@show cc_batches r_i
@@ -1167,9 +1167,9 @@ function generate_bg(events,bins,r_grid,InverseEoS,Norm;NumPhiPoints=20,Threaded
 
 end
 
-function generate_tw_pt_fct_entropy(events,bins,r_grid,m_list,Norm;NumPhiPoints=20,Threaded=true,Nfields=10)
+function generate_tw_pt_fct_entropy(batches,bins,r_grid,m_list,Norm;NumPhiPoints=20,Threaded=true,Nfields=10)
     finalCorrelator=zeros(eltype(r_grid),length(bins),2,Nfields,Nfields,length(m_list),length(r_grid),length(r_grid))
-    batches=MonteCarloGlauber.centralities_selection_events(events,bins;Threaded=Threaded)
+    #batches=MonteCarloGlauber.centralities_selection_events(events,bins;Threaded=Threaded)
     for cc in 1:length(batches)-1
         for m in 1:length(m_list)
             for r1 in 1:length(r_grid)
@@ -1183,12 +1183,73 @@ function generate_tw_pt_fct_entropy(events,bins,r_grid,m_list,Norm;NumPhiPoints=
     return finalCorrelator
 end
 
+
+function generate_bg_twpt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins,mList;minBiasEvents=1000000,r_grid=0:1:10,NumPhiPoints=20,Threaded=true,Nfields=10)
+    correlator=zeros(eltype(r_grid),length(bins),2,Nfields,Nfields,length(mList),length(r_grid),length(r_grid))
+    participants=Participants(Projectile1,Projectile2,w,sqrtS,k,p)
+    if Threaded
+        events=rand(threaded(participants),minBiasEvents)
+    else
+        events=rand(participants,minBiasEvents)
+    end
+    batches = MonteCarloGlauber.centralities_selection_events(events,bins;Threaded=Threaded)
+    bg = generate_bg(batches,bins,r_grid,f,norm;NumPhiPoints=NumPhiPoints,Threaded=Threaded)
+    tw_pt_entropy = generate_tw_pt_fct_entropy(batches,bins,r_grid,mList,norm;NumPhiPoints=NumPhiPoints,Nfields=Nfields)
+    for cc in 1:length(batches)-1
+        for m in 1:length(mList)
+            for r1 in 1:length(r_grid)
+                for r2 in r1:length(r_grid)
+                    correlator[cc,1,1,1,m,r1,r2]=tw_pt_entropy[cc,1,1,1,m,r1,r2]*delta_factor(bg[cc,r1])*delta_factor(bg[cc,r2])
+                    correlator[cc,1,1,1,m,r2,r1]=correlator[cc,1,1,1,m,r1,r2]
+                end
+            end
+        end
+    end
+    return bg,correlator 
+end
+
+k
+a10,b10=generate_bg_twpt_fct(entropyToTemp,dSdTinverse,30,n1,n2,w,10,p,s_NN,[1],[2,3];minBiasEvents=5000,r_grid=0.:0.5:10)
+a1,b1=generate_bg_twpt_fct(entropyToTemp,dSdTinverse,30,n1,n2,w,1,p,s_NN,[1],[2,3];minBiasEvents=5000,r_grid=0.:0.5:10)
+a01,b01=generate_bg_twpt_fct(entropyToTemp,dSdTinverse,30,n1,n2,w,0.1,p,s_NN,[1],[2,3];minBiasEvents=5000,r_grid=0.:0.5:10)
+
+sqrt(maximum(b10[1,1,1,1,1,:,:]))/maximum(a10[1,:])
+sqrt(maximum(b1[1,1,1,1,1,:,:]))/maximum(a1[1,:])
+sqrt(maximum(b01[1,1,1,1,1,:,:]))/maximum(a01[1,:])
+
+sqrt(-minimum(b10[1,1,1,1,1,:,:]))/maximum(a10[1,:])
+sqrt(-minimum(b1[1,1,1,1,1,:,:]))/maximum(a1[1,:])
+sqrt(-minimum(b01[1,1,1,1,1,:,:]))/maximum(a01[1,:])
+
+plot(a10[1,:])
+plot!(a1[1,:])
+plot!(a01[1,:])
+
+plot(heatmap(b[1,1,1,1,1,1:30,1:30]),heatmap(b[2,1,1,1,1,1:30,1:30]),heatmap(b[1,1,1,1,2,1:30,1:30]),heatmap(b[2,1,1,1,2,1:30,1:30]))
+
+heatmap(b[1,1,1,1,1,1:30,1:30])
+
+
+plot(b[1,1,1,1,1,1,1:20])
+plot!(a[1,:])
+
+plot(a[1,:])
+plot(dSdTinverse.(a[1,:]))
+
+sqrt(maximum(b[1,1,1,1,1,1:30,1:30]))
+maximum(a[1,:])
+
+sqrt(maximum(b[1,1,1,1,1,1:30,1:30]))/maximum(a[1,:])
+
+
+batches
 second_cumulant(ddd,1,1,2,100,20)
 
-fun(T)=T^6
+fun(T)=T
 length(0.:0.1:10)
 ddd=rand(participants,100)
-a=generate_bg(ddd,[10,20],0.:1:10,fun,2)
+a=generate_bg(batches,[10,20],0.:1:10,fun,2)
+a[1,2]
 plot(a[1,:])
 plot!(a[2,:])
 plot!(a[3,:])

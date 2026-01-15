@@ -863,3 +863,59 @@ function change_norm(bg,finalCorr,new_norm,old_norm,eos)
     rescaled_finalCorr=finalCorr .* (rescaling_factor^2)
     return rescaled_bg, rescaled_finalCorr
 end
+
+function generate_bg(batches,bins,r_grid,InverseEoS,Norm;NumPhiPoints=20,Threaded=true)
+    bg=zeros(eltype(r_grid),length(bins),length(r_grid))
+    #batches=MonteCarloGlauber.centralities_selection_events(events,bins;Threaded=Threaded)
+    for cc_batches in 1:length(batches)-1
+        for r_i in eachindex(r_grid)
+            r=r_grid[r_i]
+            #@show cc_batches r_i
+            bg[cc_batches,r_i]= real.(mean_at(batches[cc_batches],r,0,NumPhiPoints))
+
+        end
+    end
+    return InverseEoS.(Norm .*bg)
+
+end
+
+function generate_tw_pt_fct_entropy(batches,bins,r_grid,m_list,Norm;NumPhiPoints=20,Threaded=true,Nfields=10)
+    finalCorrelator=zeros(eltype(r_grid),length(bins),2,Nfields,Nfields,length(m_list),length(r_grid),length(r_grid))
+    #batches=MonteCarloGlauber.centralities_selection_events(events,bins;Threaded=Threaded)
+    for cc in 1:length(batches)-1
+        for m in 1:length(m_list)
+            for r1 in 1:length(r_grid)
+                for r2 in r1:length(r_grid)
+                    finalCorrelator[cc,1,1,1,m,r1,r2]=real.(second_cumulant(batches[cc],r_grid[r1],r_grid[r2],m_list[m],Norm,NumPhiPoints))
+                    finalCorrelator[cc,1,1,1,m,r2,r1]=finalCorrelator[cc,1,1,1,m,r1,r2]
+                end
+            end
+        end
+    end
+    return finalCorrelator
+end
+
+
+function generate_bg_twpt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins,mList;minBiasEvents=1000000,r_grid=0:1:10,NumPhiPoints=20,Threaded=true,Nfields=10)
+    correlator=zeros(eltype(r_grid),length(bins),2,Nfields,Nfields,length(mList),length(r_grid),length(r_grid))
+    participants=Participants(Projectile1,Projectile2,w,sqrtS,k,p)
+    if Threaded
+        events=rand(threaded(participants),minBiasEvents)
+    else
+        events=rand(participants,minBiasEvents)
+    end
+    batches = centralities_selection_events(events,bins;Threaded=Threaded)
+    bg = generate_bg(batches,bins,r_grid,f,norm;NumPhiPoints=NumPhiPoints,Threaded=Threaded)
+    tw_pt_entropy = generate_tw_pt_fct_entropy(batches,bins,r_grid,mList,norm;NumPhiPoints=NumPhiPoints,Nfields=Nfields)
+    for cc in 1:length(batches)-1
+        for m in 1:length(mList)
+            for r1 in 1:length(r_grid)
+                for r2 in r1:length(r_grid)
+                    correlator[cc,1,1,1,m,r1,r2]=tw_pt_entropy[cc,1,1,1,m,r1,r2]*delta_factor(bg[cc,r1])*delta_factor(bg[cc,r2])
+                    correlator[cc,1,1,1,m,r2,r1]=correlator[cc,1,1,1,m,r1,r2]
+                end
+            end
+        end
+    end
+    return bg,correlator 
+end
