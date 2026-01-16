@@ -248,7 +248,7 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
             shape_2=rand(rng,distribution,length(r2))
             part=Participant(r1,r2,shape_1,shape_2,ncoll,nucleos.sub_nucleon_width,nucleos.shape_parameter,nucleos.p,R1,R2,b,0.0)
             #CoM=center_of_mass(Participant)
-            mult, x_cm, y_cm=center_of_mass_gl!(part,nucleos.accumulation_preparation)
+            mult, x_cm, y_cm=center_of_mass!(part,nucleos.accumulation_preparation)
             r_cm = SVector{2}(x_cm/mult,y_cm/mult)
             @inbounds for i in eachindex(r1) 
                 r1[i] = r1[i] -r_cm

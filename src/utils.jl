@@ -1,48 +1,6 @@
-"""
-    center_of_mass(con; Nr=100, Nth=50) 
-
-Calculate the center of mass for a given participant configuration.
-
-# Arguments
-- `con::Participant`: The participant configuration.
-- `Nr`: Number of radial divisions (default: 100).
-- `Nth`: Number of angular divisions (default: 50).
-
-# Returns
-- `SVector{3}`: The multiplicity ad x and y as static vector.
-"""
-function center_of_mass(con::T,Nr=100, Nth=50) where {T<:Participant}
-    R1=con.R1
-    R2=con.R2
-    Rmax=3*(R1+R2)
-    δr=Rmax/Nr
-    δθ=2pi/Nth
-    r_range=range(δr/2,Rmax-δr/2,Nr)
-    theta_range=range(0,2pi,Nth)
-    #sum(Iterators.product(enumerate(r_range),enumerate(theta_range))) do ((ir,r),(iθ, θ))
-    Δ=δr*δθ
-    mult=zero(eltype(con))
-    x_cm=zero(eltype(con))
-    y_cm=zero(eltype(con))
-    @fastmath for  θ in theta_range
-        s,c=sincos(θ)
-        @fastmath @simd for r in r_range  
-            x=r*c
-            y=r*s
-            mesure=Δ*r
-            multiplicity=con(x,y)*mesure
-            
-            mult +=multiplicity
-            x_cm +=multiplicity*x
-            y_cm +=multiplicity*y
-           
-        end 
-    end 
-    return (mult,x_cm,y_cm)
-end
 
 """
-    center_of_mass_gl(con; Nr=64, Nth=64)
+    center_of_mass(con; Nr=64, Nth=64)
 
 Compute center of mass using Gauss–Legendre quadrature in r and trapezoidal rule in θ.
 This converges faster than the uniform grid for smooth profiles.
@@ -55,8 +13,8 @@ This converges faster than the uniform grid for smooth profiles.
 # Returns
 - `(mult, x_cm, y_cm)`: Multiplicity and first moments.
 """
-@inline function center_of_mass_gl(con::T, Nr=64, Nth=64) where {T<:Participant}
-  center_of_mass_gl!(con, prepare_accumulation(con, Nr, Nth))
+@inline function center_of_mass(con::T, Nr=64, Nth=64) where {T<:Participant}
+  center_of_mass!(con, prepare_accumulation(con, Nr, Nth))
 end
 
 """
@@ -93,13 +51,9 @@ end
 
 prepare_accumulation(con::T, Nr=64, Nth=64) where {T<:Participant} = prepare_accumulation(con.R1,con.R2, Nr,Nth)
 
-# Legacy version for backward compatibility
-@inline function prepare_accumulation(Nr::Integer)
-    FastGaussQuadrature.gausslegendre(Nr)
-end
 
 """
-    center_of_mass_gl!(con, cache)
+    center_of_mass!(con, cache)
 
 Non-allocating variant using pre-computed cache from `prepare_accumulation(con, Nr, Nth)`.
 
@@ -110,7 +64,7 @@ Non-allocating variant using pre-computed cache from `prepare_accumulation(con, 
 # Returns
 - `(mult, x_cm, y_cm)`: Multiplicity and first moments.
 """
-function center_of_mass_gl!(con::T, cache) where {T<:Participant}
+function center_of_mass!(con::T, cache) where {T<:Participant}
     r_vals, r_weights, sinθ, cosθ, θ_weight = cache.r_vals, cache.r_weights, cache.sinθ, cache.cosθ, cache.θ_weight
 
     mult = zero(eltype(con))
