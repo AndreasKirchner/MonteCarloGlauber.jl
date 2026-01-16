@@ -25,7 +25,11 @@ using HDF5
 open("src/NLEFT_dmin_0.5fm_negativeweights_Ne.h5","r")
 
 
-participants=Participants(n1,n1,w,s_NN,k,p)
+participants=Participants(n1,n1,w,s_NN,k,p,Nr=64,Nth=32)
+
+MonteCarloGlauber.center_of_mass_gl(rand(participants))
+
+@benchmark rand(participants)
 
 e(T)=T^3pi
 e(2)

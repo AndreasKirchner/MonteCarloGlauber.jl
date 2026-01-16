@@ -117,7 +117,7 @@ function Participants
 
 end 
 
-function Participants(n1,n2,w,s_NN,k,p,b::Tuple{T1,T2};Nr=32,Nth=32) where {T1<:Real,T2<:Real}
+function Participants(n1,n2,w,s_NN,k,p,b::Tuple{T1,T2};Nr=64,Nth=32) where {T1<:Real,T2<:Real}
 
     sigma_NN=cross_section_from_energy(s_NN)
     f(sigmagg,p)=totalcross_section(w,sigmagg,sigma_NN) 
