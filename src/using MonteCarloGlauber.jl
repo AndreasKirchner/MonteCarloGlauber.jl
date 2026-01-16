@@ -25,11 +25,7 @@ using HDF5
 open("src/NLEFT_dmin_0.5fm_negativeweights_Ne.h5","r")
 
 
-participants=Participants(n1,n1,w,s_NN,k,p,Nr=64,Nth=32)
-
-MonteCarloGlauber.center_of_mass_gl(rand(participants))
-
-@benchmark rand(participants)
+participants=Participants(n1,n1,w,s_NN,k,p)
 
 e(T)=T^3pi
 e(2)
@@ -1173,9 +1169,14 @@ using MonteCarloGlauber
 
 participants=Participants(n1,n2,w,s_NN,k,p)
 
-@benchmark rand(participants,1)
 
-ddd=rand(participants,100)
+
+ddd=rand(participants,10)
+
+MonteCarloGlauber.center_of_mass_gl(ddd[1])
+MonteCarloGlauber.center_of_mass_gl(ddd[2])
+MonteCarloGlauber.center_of_mass_gl(ddd[3])
+MonteCarloGlauber.center_of_mass_gl(ddd[4])
 
 aa=MonteCarloGlauber.prepare_accumulation(ddd[2])
 aa2=MonteCarloGlauber.prepare_accumulation2(ddd[1])
@@ -1216,7 +1217,7 @@ using Plots
 
 participants=Participants(n1,n2,w,s_NN,k,p)
 
-ddd=rand(participants,1000)
+ddd=rand(participants,100)
 batches=MonteCarloGlauber.centralities_selection_events(ddd,[10,20])
 
 function generate_bg(batches,bins,r_grid,InverseEoS,Norm;NumPhiPoints=20,Threaded=true)
@@ -1245,6 +1246,9 @@ plot!(bg_new[2,:])
 last(bg_new[1,:])
 last(bg_new[2,:])
 
+aaa=zeros(3,5,5,6,7)
+aaa
+size(aaa)[4]
 
 function generate_tw_pt_fct_entropy(batches,bins,r_grid,m_list,Norm;NumPhiPoints=20,Threaded=true,Nfields=10)
     finalCorrelator=zeros(eltype(r_grid),length(bins),2,Nfields,Nfields,length(m_list),length(r_grid),length(r_grid))
@@ -1296,9 +1300,37 @@ end
 
 using Statistics
 k
+using MonteCarloGlauber
+
+using Fluidum
+using MonteCarloGlauber
+using Plots
+
+#INITIAL CONDITIONS
+n1= Lead()
+n2= Lead()
+w= 0.5
+s_NN=5000.
+k=1.
+p=0.
+Norm = 50.
+eos= FluiduMEoS()
+centrality_bins=[5,10,20,30]
+mlist = [2,3]
+
+entropy(T)=T#pressure_derivative(T,Val(1),FluiduMEoS()) #entropy as function of temperature
+entropyToTemp(T)=T#InverseFunction(entropy)(T) #inverse, i.e. T(s)
+dSdT(T)=T#pressure_derivative(T,Val(2),FluiduMEoS()) #function to convert perturbations as function of bg temp, i.e. dT/ds(T_0)
+dSdTinverse(T) = T#1/dSdT(T)
+
+
 a10,b10=generate_bg_twpt_fct(entropyToTemp,dSdTinverse,30,n1,n2,w,10,p,s_NN,[10],[2,3];minBiasEvents=100,r_grid=0.:1:20)
+
+
 a1,b1=generate_bg_twpt_fct(entropyToTemp,dSdTinverse,30,n1,n2,w,1,p,s_NN,[10],[2,3];minBiasEvents=500,r_grid=0.:1:20)
 a01,b01=generate_bg_twpt_fct(entropyToTemp,dSdTinverse,30,n1,n2,w,0.1,p,s_NN,[10],[2,3];minBiasEvents=500,r_grid=0.:1:20)
+
+a10
 
 heatmap(b10[1,1,1,1,1,:,:])
 plot(b10[1,1,1,1,1,10,:])

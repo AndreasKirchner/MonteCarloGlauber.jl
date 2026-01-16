@@ -17,6 +17,7 @@ using Base.Threads
 using DelimitedFiles
 using HDF5
 using FastGaussQuadrature
+using Statistics
 
 
 
@@ -64,16 +65,17 @@ Generates the background and two-point correlation function for a given set of p
   The dimensions are `[2, nFields, length(mList), nGrid, nGrid]`, where:
 
 # Example
-```julia
+#```julia
 bg, finalCorr = generate_bg_two_pt_fct(
     f, delta_factor, norm, Projectile1, Projectile2, 
     w, k, p, sqrtS, bins, mList; 
     minBiasEvents=1000000, r_grid=0:1:10, step=2pi/20, Threaded=true
 )
-"""
 
-function generate_bg_two_pt_fct
-end
+"""
+#
+#function generate_bg_two_pt_fct
+#end
 
 export NucleiWoodSaxon3D,IntegratedWoodSaxonInterp,IntegratedWoodSaxon, Participants, Participant, threaded, Threaded, rand, TabulatedEvent
 export impactParameter ,multiplicity,center_of_mass,centralities_selection

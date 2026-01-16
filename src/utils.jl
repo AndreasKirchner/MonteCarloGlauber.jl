@@ -676,35 +676,97 @@ function change_norm(bg,finalCorr,new_norm,old_norm,eos)
     return rescaled_bg, rescaled_finalCorr
 end
 
-function generate_bg(batches,bins,r_grid,InverseEoS,Norm;NumPhiPoints=20,Threaded=true)
+
+function mean_at(configuration,r_1,m,len)
+    mean(configuration) do conf
+        mean(range(0,2pi,len)) do θ_1
+                x_1= r_1 *cos(θ_1) 
+                y_1= r_1 *sin(θ_1) 
+            conf(x_1,y_1)exp(im*m*(θ_1))
+        end  
+    end 
+end
+
+function second_cumulant(configuration,r_1,r_2,m,norm,len)
+    result= zero(first(configuration)(r_1,r_2)im)
+    result_av=zero(result)
+    result_av_cc=zero(result)
+    nevnet=length(configuration)
+    θrange= range(0,2pi,len)
+    for i_conf in eachindex(configuration)
+        @inbounds conf=configuration[i_conf]
+        sums=zero(result)
+        sumaverege=zero(result)
+        sumaverage_cc=zero(result)
+            for θ_1 in θrange
+                s1,c1=sincos(θ_1)
+                x_1= r_1*c1
+                y_1= r_1*s1 
+                c_1=norm*conf(x_1,y_1)
+                sfirst,cfirst=sincos(m*θ_1)
+                #firstfactor=c_1*(sfirst+im*cfirst)
+                firstfactor=c_1*(cfirst+im*sfirst)
+                sumaverege+= firstfactor #<s^m(r)>
+                for θ_2 in θrange
+                    s2,c2=sincos(θ_2)
+                    x_2= r_2*c2
+                    y_2= r_2*s2 
+                    c_2=norm*conf(x_2,y_2)
+                    sdiff,cdiff=sincos(m*(θ_2))
+                    sums+= c_2*(cdiff-im*sdiff)*firstfactor # int phi_i phi_j entropy(ri,phii)*entropy(r_j,phij_)*exp(i*m*(phi_i-phi_j))
+                    sumaverage_cc =  c_2*(cdiff-im*sdiff)
+                end 
+            end 
+        result += sums
+        result_av+=sumaverege
+        result_av_cc+=sumaverage_cc
+    end 
+   #return (result-abs2(result_av)/nevnet)/(nevnet*len*len)
+   return (result-result_av*result_av_cc/nevnet)/(nevnet*len*len)
+end
+
+
+function generate_bg(batches,bins,r_grid,InverseEoS,Norm;NumPhiPoints=20)
     bg=zeros(eltype(r_grid),length(bins),length(r_grid))
-    #batches=MonteCarloGlauber.centralities_selection_events(events,bins;Threaded=Threaded)
     for cc_batches in 1:length(batches)-1
         for r_i in eachindex(r_grid)
             r=r_grid[r_i]
-            #@show cc_batches r_i
             bg[cc_batches,r_i]= real.(mean_at(batches[cc_batches],r,0,NumPhiPoints))
-
         end
     end
     return InverseEoS.(Norm .*bg)
-
 end
 
-function generate_tw_pt_fct_entropy(batches,bins,r_grid,m_list,Norm;NumPhiPoints=20,Threaded=true,Nfields=10)
+function generate_tw_pt_fct_entropy(batches,bins,r_grid,m_list,Norm;NumPhiPoints=20,Nfields=10)
     finalCorrelator=zeros(eltype(r_grid),length(bins),2,Nfields,Nfields,length(m_list),length(r_grid),length(r_grid))
-    #batches=MonteCarloGlauber.centralities_selection_events(events,bins;Threaded=Threaded)
     for cc in 1:length(batches)-1
         for m in 1:length(m_list)
             for r1 in 1:length(r_grid)
                 for r2 in r1:length(r_grid)
-                    finalCorrelator[cc,1,1,1,m,r1,r2]=real.(second_cumulant(batches[cc],r_grid[r1],r_grid[r2],m_list[m],Norm,NumPhiPoints))
+                    finalCorrelator[cc,1,1,1,m,r1,r2]=real(second_cumulant(batches[cc],r_grid[r1],r_grid[r2],m_list[m],Norm,NumPhiPoints))
                     finalCorrelator[cc,1,1,1,m,r2,r1]=finalCorrelator[cc,1,1,1,m,r1,r2]
                 end
             end
         end
     end
     return finalCorrelator
+end
+
+function eos_convert_correlator(delta_factor,bg,correlator)
+    ccLen = size(bg)[1]
+    rLen = size(bg)[2]
+    mLen = size(correlator)[5]
+    for cc in 1:ccLen
+        for m in 1:mLen
+            for r1 in 1:rLen
+                for r2 in r1:rLen
+                    correlator[cc,1,1,1,m,r1,r2]=tw_pt_entropy[cc,1,1,1,m,r1,r2]*delta_factor(bg[cc,r1])*delta_factor(bg[cc,r2])
+                    correlator[cc,1,1,1,m,r2,r1]=correlator[cc,1,1,1,m,r1,r2]
+                end
+            end
+        end
+    end
+    return correlator
 end
 
 
@@ -719,15 +781,6 @@ function generate_bg_twpt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,
     batches = centralities_selection_events(events,bins;Threaded=Threaded)
     bg = generate_bg(batches,bins,r_grid,f,norm;NumPhiPoints=NumPhiPoints,Threaded=Threaded)
     tw_pt_entropy = generate_tw_pt_fct_entropy(batches,bins,r_grid,mList,norm;NumPhiPoints=NumPhiPoints,Nfields=Nfields)
-    for cc in 1:length(batches)-1
-        for m in 1:length(mList)
-            for r1 in 1:length(r_grid)
-                for r2 in r1:length(r_grid)
-                    correlator[cc,1,1,1,m,r1,r2]=tw_pt_entropy[cc,1,1,1,m,r1,r2]*delta_factor(bg[cc,r1])*delta_factor(bg[cc,r2])
-                    correlator[cc,1,1,1,m,r2,r1]=correlator[cc,1,1,1,m,r1,r2]
-                end
-            end
-        end
-    end
+    correlator = eos_convert_correlator(delta_factor,bg,tw_pt_entropy)
     return bg,correlator 
 end
