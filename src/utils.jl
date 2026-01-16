@@ -70,8 +70,8 @@ Returns a NamedTuple (r_vals, r_weights, sinθ, cosθ) ready for use in _gl! fun
 - `Nr`: Number of Gauss–Legendre nodes (radial).
 - `Nth`: Number of angular divisions.
 """
-function prepare_accumulation(con::T, Nr=64, Nth=64) where {T<:Participant}
-    Rmax = 3 * (con.R1 + con.R2)
+function prepare_accumulation(R1, R2, Nr=64, Nth=64) 
+    Rmax = 3 * (R1+ R2)
     half_R = Rmax / 2
     Δθ = 2pi / Nth
     
@@ -91,34 +91,7 @@ function prepare_accumulation(con::T, Nr=64, Nth=64) where {T<:Participant}
     return (r_vals=r_vals, r_weights=r_weights, sinθ=sinθ, cosθ=cosθ, θ_weight=θ_weight)
 end
 
-function prepare_accumulation2(con::T, Nr=64, Nth=64) where {T<:Participant}
-    Rmax = 3 * (con.R1 + con.R2)
-    half_R = Rmax / 2
-    Δθ = 2pi / Nth
-    
-    # 1. Obtain standard nodes and weights
-    r_nodes, r_w = FastGaussQuadrature.gausslegendre(Nr)
-    
-    # 2. Map nodes to [0, Rmax]
-    r_vals = (r_nodes .+ 1) .* half_R
-    
-    # 3. Compute weights: (dr scaling) * (Jacobian r) * (dθ)
-    # This allows you to simply sum f(r, θ) * weight
-    combined_r_weights = r_w .* half_R .* r_vals .* Δθ
-    
-    # 4. θ values and trig pre-computation
-    # Using range 0:Nth-1 is correct for trapezoidal/periodic
-    θ_vals = (0:Nth-1) .* Δθ
-    sinθ = sin.(θ_vals)
-    cosθ = cos.(θ_vals)
-    
-    return (
-        r_vals = r_vals, 
-        r_weights = combined_r_weights, # Total weight per radial node
-        sinθ = sinθ, 
-        cosθ = cosθ
-    )
-end
+prepare_accumulation(con::T, Nr=64, Nth=64) where {T<:Participant} = prepare_accumulation(con.R1,con.R2, Nr,Nth)
 
 # Legacy version for backward compatibility
 @inline function prepare_accumulation(Nr::Integer)

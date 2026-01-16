@@ -88,7 +88,7 @@ function fluctuating_thickness(x::Num1,y::Num2,f::Vector{Participant{T,S,V,M,C,D
 end 
 
 
-struct Participants{A,B,C,D,E,F,G,L} <:Sampleable{Univariate,Participant}
+struct Participants{A,B,C,D,E,F,G,H,L} <:Sampleable{Univariate,Participant}
     nucl1::A
     nucl2::B
     sub_nucleon_width::C
@@ -98,6 +98,7 @@ struct Participants{A,B,C,D,E,F,G,L} <:Sampleable{Univariate,Participant}
     shape_parameter::F
     total_cross_section::Float64
     p::L
+    accumulation_preparation::H
 end 
 
 """
@@ -116,41 +117,38 @@ function Participants
 
 end 
 
-function Participants(n1,n2,w,s_NN,k,p,b::Tuple{T1,T2}) where {T1<:Real,T2<:Real}
+function Participants(n1,n2,w,s_NN,k,p,b::Tuple{T1,T2};Nr=32,Nth=32) where {T1<:Real,T2<:Real}
 
     sigma_NN=cross_section_from_energy(s_NN)
     f(sigmagg,p)=totalcross_section(w,sigmagg,sigma_NN) 
     u0 =one(sigma_NN) #one(eltype(f))
     prob = NonlinearProblem{false}(f, u0)
     sol=solve(prob,SimpleNewtonRaphson())
-
-
     sigg=sol.u
-    #put check for w here
-    
-#    if length(b) ==1 
-#    return Participants(n1,n2,w,TriangularDist(b,b,b),Uniform(0,2pi),sigg,k,sigma_NN,p)
-#    end 
 
-    return Participants(n1,n2,w,truncated(TriangularDist(0,b[2],b[2]),b[1],b[2]),Uniform(0,2pi),sigg,k,sigma_NN,p)
-    #Participants(n1,n2,w,truncated(TriangularDist(0,b[2],b[2]),b[1],b[2]),Uniform(0,2pi),sigg,k,Float64(sigma_NN),p)
+    R1=n1.R    
+    R2=n2.R   
+    prep=prepare_accumulation(R1,R2,Nr,Nth)
+    
+    return Participants(n1,n2,w,truncated(TriangularDist(0,b[2],b[2]),b[1],b[2]),Uniform(0,2pi),sigg,k,sigma_NN,p,prep)
+
 end 
 
 
 
-dimension(s::Participants{A,B,C,D,E,F,G,L}) where {A,B,C,D,E,F,G,L}  = 1
+dimension(s::Participants{A,B,C,D,E,F,G,L,H}) where {A,B,C,D,E,F,G,L,H}  = 1
 
 
-function Participants(n1,n2,w,s_NN,k,p)
+function Participants(n1,n2,w,s_NN,k,p;Nr=32,Nth=32)
     
     R1=n1.R    
     R2=n2.R   
 
     b=(0,3(R1+R2)+6*w)
-    Participants(n1,n2,w,s_NN,k,p,b)
+    Participants(n1,n2,w,s_NN,k,p,b;Nr=Nr,Nth=Nth)
 end
 
-function Base.eltype(::Participants{A,B,C,D,E,F,G,L}) where {A,B,C,D,E,F,G,L} 
+function Base.eltype(::Participants{A,B,C,D,E,F,G,H,L}) where {A,B,C,D,E,F,G,H,L} 
     T=promote_type(C,E,F,L) 
     Participant{T,T,T,T,C,F,L}
 end 
@@ -158,23 +156,14 @@ end
 
 
 
-function Base.copy(s::Participants{A,B,C,D,E,F,G,L}) where {A,B,C,D,E,F,G,L} 
+function Base.copy(s::Participants{A,B,C,D,E,F,G,H,L}) where {A,B,C,D,E,F,G,H,L} 
 
 
     b=unique(Distributions.params(s.inpact_parameter_magitude))
-#=
-if length(b)==1
-    
-    return Participants(copy(s.nucl1),copy(s.nucl2),s.sub_nucleon_width,TriangularDist(first(b),first(b),first(b)),Uniform(0,2pi),s.sigma_gg,s.shape_parameter,s.total_cross_section,s.p)
 
-end
-=#
-#if length(b)==2
 
     return Participants(copy(s.nucl1),copy(s.nucl2),s.sub_nucleon_width,
-    truncated(TriangularDist(0,b[2],b[2]),b[1],b[2]),Uniform(0,2pi),s.sigma_gg,s.shape_parameter,s.total_cross_section,s.p)
-
-#end
+    truncated(TriangularDist(0,b[2],b[2]),b[1],b[2]),Uniform(0,2pi),s.sigma_gg,s.shape_parameter,s.total_cross_section,s.p,deepcopy(s.accumulation_preparation))
 
 end 
 
@@ -191,7 +180,7 @@ end
 end 
 
 
-@inline @fastmath function binary_impact_parameter_probability(b2,nucleos::Participants{A,B,C,D,E,F,G,L}) where {A,B,C,D,E,F,G,L}
+@inline @fastmath function binary_impact_parameter_probability(b2,nucleos::Participants{A,B,C,D,E,F,G,H,L}) where {A,B,C,D,E,F,G,H,L}
     w=nucleos.sub_nucleon_width
     gasussd=1/(4*w^2)
     #Tnn=gasussd*exp(-b^2*gasussd)
@@ -205,7 +194,7 @@ end
 #3d case 
 
 
-function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2, C, D, E, F,G, L}) where {NUCL1, NUCL2, C, D, E, F,G, L}
+function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2, C, D, E, F,G, H,L}) where {NUCL1, NUCL2, C, D, E, F,G,H, L}
 
     
     R1=nucleos.nucl1.R
@@ -259,12 +248,12 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
             shape_2=rand(rng,distribution,length(r2))
             part=Participant(r1,r2,shape_1,shape_2,ncoll,nucleos.sub_nucleon_width,nucleos.shape_parameter,nucleos.p,R1,R2,b,0.0)
             #CoM=center_of_mass(Participant)
-            mult, x_cm, y_cm=center_of_mass_gl(part)
+            mult, x_cm, y_cm=center_of_mass_gl!(part,nucleos.prepare_accumulation)
             r_cm = SVector{2}(x_cm/mult,y_cm/mult)
-            for i in eachindex(r1) 
+            @inbounds for i in eachindex(r1) 
                 r1[i] = r1[i] -r_cm
             end 
-            for i in eachindex(r2) 
+            @inbounds for i in eachindex(r2) 
                 r2[i] = r2[i] -r_cm
             end
 
@@ -275,7 +264,7 @@ end
 
 
 
-function Distributions.rand!(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2, C, D, E, F, L}, A::AbstractVector{T}) where {NUCL1, NUCL2, C, D, E, F, L, T}
+function Distributions.rand!(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2, C, D, E, F,H, L}, A::AbstractVector{T}) where {NUCL1, NUCL2, C, D, E, F, L, H,T}
 
     for i in eachindex(A)
         A[i]= rand(rng, nucleos)
