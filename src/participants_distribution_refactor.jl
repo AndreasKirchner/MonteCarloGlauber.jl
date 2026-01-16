@@ -255,6 +255,8 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
             distribution=Gamma(k,1/k)
             shape_1=rand(rng,distribution,length(r1))
             shape_2=rand(rng,distribution,length(r2))
+            #part=Participant(r1,r2,shape_1,shape_2,ncoll,nucleos.sub_nucleon_width,nucleos.shape_parameter,nucleos.p,R1,R2,b)
+            #CoM=center_of_mass(Participant)
             return Participant(r1,r2,shape_1,shape_2,ncoll,nucleos.sub_nucleon_width,nucleos.shape_parameter,nucleos.p,R1,R2,b)
         end 
     end  

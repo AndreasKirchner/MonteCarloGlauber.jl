@@ -382,24 +382,7 @@ function centralities_selection_CoM(events::Vector{T},bins; Threaded=true ) wher
     #return centrality_borders
 end
 
-function centralities_selection_events(events::Vector{T},bins; Threaded=true ) where {T<:Participant}
-    
-    if Threaded 
-        multi=tmap(events)   do x 
-           center_of_mass(x)
-       end
-        mult=tmap(m->m[1],multi)
-        #com1=tmap(m->m[2],multi)
-        #com2=tmap(m->m[3],multi)
-    else 
-
-        multi=map(events)   do x 
-            center_of_mass(x)
-        end
-        mult=map(m->m[1],multi)
-        #com1=map(m->m[2],multi)
-        #com2=map(m->m[3],multi)
-    end
+function centralities_selection_events(events::Vector{T},bins,mult; Threaded=true ) where {T<:Participant}
 
     event_perm=sortperm(mult,rev=true)
     events_sorted=events[event_perm]

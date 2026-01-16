@@ -871,11 +871,15 @@ eos= FluiduMEoS()
 centrality_bins=[5,10,20,30]
 mlist = [2,3]
 
-entropy(T)=pressure_derivative(T,Val(1),eos) #entropy as function of temperature
+entropy(T)=pressure_derivative(T,Val(1),FluiduMEoS()) #entropy as function of temperature
 entropyToTemp(T)=InverseFunction(entropy)(T) #inverse, i.e. T(s)
-dSdT(T)=pressure_derivative(T,Val(2),eos) #function to convert perturbations as function of bg temp, i.e. dT/ds(T_0)
+dSdT(T)=pressure_derivative(T,Val(2),FluiduMEoS()) #function to convert perturbations as function of bg temp, i.e. dT/ds(T_0)
 dSdTinverse(T) = 1/dSdT(T)
-bg,twpt=MonteCarloGlauber.generate_bg_two_pt_fct_save_faster(entropyToTemp,dSdTinverse,Norm,n1,n2,w,k,p,s_NN,centrality_bins,mlist;minBiasEvents=1000,r_grid=0:0.2:15,n_ext_Grid=100,override_files=true,path="./")
+#bg,twpt=MonteCarloGlauber.generate_bg_two_pt_fct_save_faster(entropyToTemp,dSdTinverse,Norm,n1,n2,w,k,p,s_NN,centrality_bins,mlist;minBiasEvents=1000,r_grid=0:0.2:15,n_ext_Grid=100,override_files=true,path="./")
+@code_warntype entropy(1)
+@code_warntype entropyToTemp(1)
+
+entropy(1)
 
 using QuadGK
 using Statistics
@@ -1065,9 +1069,7 @@ second_cumulant(ddd,1,1,2,400)
 resi=stack(real.(res))
 heatmap(resi)
 
-
-
-function second_cumulant(configuration,r_1,r_2,m,norm,len)
+function second_cumulant_old(configuration,r_1,r_2,m,norm,len)
     result= zero(first(configuration)(r_1,r_2)im)
     result_av=zero(result)
     nevnet=length(configuration)
@@ -1078,29 +1080,87 @@ function second_cumulant(configuration,r_1,r_2,m,norm,len)
         sumaverege=zero(result)
             for θ_1 in θrange
                 s1,c1=sincos(θ_1)
-                x_1= r_1*s1
-                y_1= r_1*c1 
+                x_1= r_1*c1
+                y_1= r_1*s1 
                 c_1=norm*conf(x_1,y_1)
                 sfirst,cfirst=sincos(m*θ_1)
                 #firstfactor=c_1*(sfirst+im*cfirst)
                 firstfactor=c_1*(cfirst+im*sfirst)
-                sumaverege+= firstfactor
+                sumaverege+= firstfactor #<s^m(r)>
                 for θ_2 in θrange
                     s2,c2=sincos(θ_2)
-                    x_2= r_2*s2
-                    y_2= r_2*c2 
+                    x_2= r_2*c2
+                    y_2= r_2*s2 
                     c_2=norm*conf(x_2,y_2)
                     sdiff,cdiff=sincos(m*(θ_2))
-                    sums+= c_2*(cdiff-im*sdiff)*firstfactor
+                    sums+= c_2*(cdiff-im*sdiff)*firstfactor # int phi_i phi_j entropy(ri,phii)*entropy(r_j,phij_)*exp(i*m*(phi_i-phi_j))
                 end 
             end 
         result += sums
         result_av+=sumaverege
     end 
    return (result-abs2(result_av)/nevnet)/(nevnet*len*len)
+   #return (result-result_av*result_av_cc/nevnet)/(nevnet*len*len)
 end
 
-second_cumulant(ddd,1.2,1,0,1,20)
+function second_cumulant_new(configuration,r_1,r_2,m,norm,len)
+    result= zero(first(configuration)(r_1,r_2)im)
+    result_av=zero(result)
+    result_av_cc=zero(result)
+    nevnet=length(configuration)
+    θrange= range(0,2pi,len)
+    for i_conf in eachindex(configuration)
+        @inbounds conf=configuration[i_conf]
+        sums=zero(result)
+        sumaverege=zero(result)
+        sumaverage_cc=zero(result)
+            for θ_1 in θrange
+                s1,c1=sincos(θ_1)
+                x_1= r_1*c1
+                y_1= r_1*s1 
+                c_1=norm*conf(x_1,y_1)
+                sfirst,cfirst=sincos(m*θ_1)
+                #firstfactor=c_1*(sfirst+im*cfirst)
+                firstfactor=c_1*(cfirst+im*sfirst)
+                sumaverege+= firstfactor #<s^m(r)>
+                for θ_2 in θrange
+                    s2,c2=sincos(θ_2)
+                    x_2= r_2*c2
+                    y_2= r_2*s2 
+                    c_2=norm*conf(x_2,y_2)
+                    sdiff,cdiff=sincos(m*(θ_2))
+                    sums+= c_2*(cdiff-im*sdiff)*firstfactor # int phi_i phi_j entropy(ri,phii)*entropy(r_j,phij_)*exp(i*m*(phi_i-phi_j))
+                    sumaverage_cc =  c_2*(cdiff-im*sdiff)
+                end 
+            end 
+        result += sums
+        result_av+=sumaverege
+        result_av_cc+=sumaverage_cc
+    end 
+   #return (result-abs2(result_av)/nevnet)/(nevnet*len*len)
+   return (result-result_av*result_av_cc/nevnet)/(nevnet*len*len)
+end
+
+#<ss>-<s><s>= sum ss /N- sum 
+
+r_grid=0:1:20
+
+oldList=second_cumulant_old.(Ref(ddd),Ref(1),r_grid,Ref(2),Ref(1),Ref(10))
+newList=second_cumulant_new.(Ref(ddd),Ref(1),r_grid,Ref(2),Ref(1),Ref(10))
+
+plot(real.(oldList),label="old")
+plot!(real.(newList),label="new")
+
+second_cumulant_new(ddd,1.2,1,2,1,20)
+second_cumulant_old(ddd,1.2,1,2,1,20)
+
+second_cumulant_new(ddd,1,1,2,1,20)
+second_cumulant_old(ddd,1,1,2,1,20)
+
+second_cumulant_new(ddd,15,0.7,2,1,20)
+second_cumulant_old(ddd,15,0.7,2,1,20)
+
+
 second_cumulant(ddd,1.2,1,0,1,10)
 second_cumulant(ddd,1.2,1,0,1,200)
 second_cumulant(ddd,1,1,0,1,20)
@@ -1108,6 +1168,8 @@ second_cumulant(ddd,1,1,0,1,20)
 using MonteCarloGlauber
 
 participants=Participants(n1,n2,w,s_NN,k,p)
+
+@benchmark rand(participants,1)
 
 ddd=rand(participants,100)
 
@@ -1128,7 +1190,7 @@ function generate_tw_pt_fct(configuration,r_grid,m,norm,len)
         r1=r_grid[i1]
        for i2=i1:length(r_grid)
             r2=r_grid[i2]
-            correlator[i1,i2]= real(second_cumulant(configuration,r1,r2,m,norm,len))
+            correlator[i1,i2]= real(second_cumulant_new(configuration,r1,r2,m,norm,len))
             correlator[i2,i1]=correlator[i1,i2]
        end
     end
@@ -1150,8 +1212,9 @@ using Plots
 
 participants=Participants(n1,n2,w,s_NN,k,p)
 
-ddd=rand(participants,10000)
+ddd=rand(participants,1000)
 batches=MonteCarloGlauber.centralities_selection_events(ddd,[10,20])
+
 function generate_bg(batches,bins,r_grid,InverseEoS,Norm;NumPhiPoints=20,Threaded=true)
     bg=zeros(eltype(r_grid),length(bins),length(r_grid))
     #batches=MonteCarloGlauber.centralities_selection_events(events,bins;Threaded=Threaded)
@@ -1167,6 +1230,18 @@ function generate_bg(batches,bins,r_grid,InverseEoS,Norm;NumPhiPoints=20,Threade
 
 end
 
+bg_new=generate_bg(batches,[10,20],0.:1:20,entropyToTemp,10)
+
+@code_warntype generate_bg(batches,[10,20],0.:1:20,entropyToTemp,10)
+@code_warntype entropyToTemp(1.)
+
+plot(bg_new[1,:])
+plot!(bg_new[2,:])
+
+last(bg_new[1,:])
+last(bg_new[2,:])
+
+
 function generate_tw_pt_fct_entropy(batches,bins,r_grid,m_list,Norm;NumPhiPoints=20,Threaded=true,Nfields=10)
     finalCorrelator=zeros(eltype(r_grid),length(bins),2,Nfields,Nfields,length(m_list),length(r_grid),length(r_grid))
     #batches=MonteCarloGlauber.centralities_selection_events(events,bins;Threaded=Threaded)
@@ -1174,7 +1249,7 @@ function generate_tw_pt_fct_entropy(batches,bins,r_grid,m_list,Norm;NumPhiPoints
         for m in 1:length(m_list)
             for r1 in 1:length(r_grid)
                 for r2 in r1:length(r_grid)
-                    finalCorrelator[cc,1,1,1,m,r1,r2]=real.(second_cumulant(batches[cc],r_grid[r1],r_grid[r2],m_list[m],Norm,NumPhiPoints))
+                    finalCorrelator[cc,1,1,1,m,r1,r2]=real(second_cumulant_new(batches[cc],r_grid[r1],r_grid[r2],m_list[m],Norm,NumPhiPoints))
                     finalCorrelator[cc,1,1,1,m,r2,r1]=finalCorrelator[cc,1,1,1,m,r1,r2]
                 end
             end
@@ -1184,7 +1259,7 @@ function generate_tw_pt_fct_entropy(batches,bins,r_grid,m_list,Norm;NumPhiPoints
 end
 
 
-function generate_bg_twpt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins,mList;minBiasEvents=1000000,r_grid=0:1:10,NumPhiPoints=20,Threaded=true,Nfields=10)
+function generate_bg_twpt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,sqrtS,bins,mList;minBiasEvents=1000000,r_grid=0.:1:10,NumPhiPoints=20,Threaded=true,Nfields=10)
     correlator=zeros(eltype(r_grid),length(bins),2,Nfields,Nfields,length(mList),length(r_grid),length(r_grid))
     participants=Participants(Projectile1,Projectile2,w,sqrtS,k,p)
     if Threaded
@@ -1192,10 +1267,15 @@ function generate_bg_twpt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,
     else
         events=rand(participants,minBiasEvents)
     end
-    batches = MonteCarloGlauber.centralities_selection_events(events,bins;Threaded=Threaded)
+    temp_shift_vector = MonteCarloGlauber.shift_and_compute.(events)
+    new_event = getindex.(temp_shift_vector,1)
+    mult = getindex.(temp_shift_vector,2)
+
+    batches = MonteCarloGlauber.centralities_selection_events(new_event,bins,mult;Threaded=Threaded)
     bg = generate_bg(batches,bins,r_grid,f,norm;NumPhiPoints=NumPhiPoints,Threaded=Threaded)
     tw_pt_entropy = generate_tw_pt_fct_entropy(batches,bins,r_grid,mList,norm;NumPhiPoints=NumPhiPoints,Nfields=Nfields)
-    for cc in 1:length(batches)-1
+    
+    for cc in 1:length(batches)-1 #TODO put this in own function
         for m in 1:length(mList)
             for r1 in 1:length(r_grid)
                 for r2 in r1:length(r_grid)
@@ -1205,21 +1285,55 @@ function generate_bg_twpt_fct(f,delta_factor,norm,Projectile1,Projectile2,w,k,p,
             end
         end
     end
+    
     return bg,correlator 
 end
+@code_warntype generate_bg_twpt_fct(entropyToTemp,dSdTinverse,30,n1,n2,w,10,p,s_NN,[10],[2,3];minBiasEvents=500,r_grid=0.:1:20)
+
 using Statistics
 k
-a10,b10=generate_bg_twpt_fct(entropyToTemp,dSdTinverse,30,n1,n2,w,10,p,s_NN,[10],[2,3];minBiasEvents=500,r_grid=0.:1:20)
+a10,b10=generate_bg_twpt_fct(entropyToTemp,dSdTinverse,30,n1,n2,w,10,p,s_NN,[10],[2,3];minBiasEvents=100,r_grid=0.:1:20)
 a1,b1=generate_bg_twpt_fct(entropyToTemp,dSdTinverse,30,n1,n2,w,1,p,s_NN,[10],[2,3];minBiasEvents=500,r_grid=0.:1:20)
 a01,b01=generate_bg_twpt_fct(entropyToTemp,dSdTinverse,30,n1,n2,w,0.1,p,s_NN,[10],[2,3];minBiasEvents=500,r_grid=0.:1:20)
 
 heatmap(b10[1,1,1,1,1,:,:])
-heatmap(b10[1,1,1,1,1,1:6,1:6])
+plot(b10[1,1,1,1,1,10,:])
+heatmap(b10[1,1,1,1,1,1:9,1:9])
+
+minimum(b10[1,1,1,1,1,:,:])
+
+@code_warntype generate_bg_twpt_fct(entropyToTemp,dSdTinverse,30,n1,n2,w,10,p,s_NN,[10],[2,3];minBiasEvents=500,r_grid=0.:1:20)
+@benchmark generate_bg_twpt_fct($entropyToTemp,$dSdTinverse,30,n1,n2,w,10,p,s_NN,[10],[2,3];minBiasEvents=500,r_grid=0.:1:20)
+
+plot(dSdTinverse.(a10[1,:] .+0.01))
 
 exponential_tail_pointlike(function_profile,x;xmax = 8, offset = 0.015)
 temperature_funct = linear_interpolation(r, temperature_profile; extrapolation_bc=Flat()) #from 9.9 fm it's flat
 
 temp_exp = exponential_tail_pointlike.(Ref(temperature_funct), radius; xmax = x_max_x, offset = offset_x)
+
+using Interpolations
+r_grid=range(0.,20)
+a10
+bgfun=Fluidum.linear_interpolation(r_grid,a10[1,:];extrapolation_bc=Flat())
+
+
+bgfun(2.23)
+
+bg_good=Fluidum.exponential_tail_pointlike.(Ref(bgfun),r_grid;xmax=10,offset=0.015)
+
+function addTailBG(bg,r_grid;xmax=10,offset=0.015)
+    bgfun=Fluidum.linear_interpolation(r_grid,bg;extrapolation_bc=Flat())
+    return Fluidum.exponential_tail_pointlike.(Ref(bgfun),r_grid;xmax=xmax,offset=offset)
+end
+
+addTailBG(a10[1,:],r_grid)
+
+plot(r_grid,bg_good)
+plot!(r_grid,a10[1,:])
+
+plot(r_grid,dSdTinverse.(bg_good))
+plot!(r_grid,dSdTinverse.(a10[1,:]))
 
 
 plot(a10[1,:])
