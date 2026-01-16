@@ -13,9 +13,11 @@ struct Participant{T,S,V,M,C,D,F} <:ValueSupport
     R1::Float64
     R2::Float64
     b::Float64
+    multiplicity::Float64
 end
 
 impactParameter(x::Participant{T,S,V,M,C,D,F} ) where {T,S,V,M,C,D,F} = x.b
+multiplicity(x::Participant{T,S,V,M,C,D,F} ) where {T,S,V,M,C,D,F} = x.multiplicity
 
 Base.eltype(::Participant{T,S,V,M,C,D,F} ) where {T,S,V,M,C,D,F}  = promote_type(T,S)
 
@@ -255,9 +257,18 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
             distribution=Gamma(k,1/k)
             shape_1=rand(rng,distribution,length(r1))
             shape_2=rand(rng,distribution,length(r2))
-            #part=Participant(r1,r2,shape_1,shape_2,ncoll,nucleos.sub_nucleon_width,nucleos.shape_parameter,nucleos.p,R1,R2,b)
+            part=Participant(r1,r2,shape_1,shape_2,ncoll,nucleos.sub_nucleon_width,nucleos.shape_parameter,nucleos.p,R1,R2,b,0.0)
             #CoM=center_of_mass(Participant)
-            return Participant(r1,r2,shape_1,shape_2,ncoll,nucleos.sub_nucleon_width,nucleos.shape_parameter,nucleos.p,R1,R2,b)
+            mult, x_cm, y_cm=center_of_mass_gl(part)
+            r_cm = SVector{2}(x_cm/mult,y_cm/mult)
+            for i in eachindex(r1) 
+                r1[i] = r1[i] -r_cm
+            end 
+            for i in eachindex(r2) 
+                r2[i] = r2[i] -r_cm
+            end
+
+            return Participant(r1,r2,shape_1,shape_2,ncoll,nucleos.sub_nucleon_width,nucleos.shape_parameter,nucleos.p,R1,R2,b,mult)
         end 
     end  
 end
