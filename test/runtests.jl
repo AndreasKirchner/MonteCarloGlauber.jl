@@ -43,13 +43,13 @@ using Test
         @test eltype(dd) == Float64
 
         sample = rand(rng, dd, 6)
-        @test size(sample) == (6, 2)
-        @test eltype(sample) == Float64
+        @test size(sample) == (6,)
+        @test eltype(sample) == Matrix{Float64}
     end
 
     @testset "Participant helpers" begin
-        part1 = [@SVector [0.0, 0.0], @SVector [0.5, -0.25]]
-        part2 = [@SVector [0.25, 0.25]]
+        part1 = [SVector(0.0, 0.0), SVector(0.5, -0.25)]
+        part2 = [SVector(0.25, 0.25)]
         shape1 = [1.0, 1.0]
         shape2 = [1.0]
         participant = Participant(part1, part2, shape1, shape2, 1, 0.5, 1.0, 0.0, 5.0, 5.0, 0.0, 1.0)
