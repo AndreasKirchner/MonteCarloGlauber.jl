@@ -4,7 +4,7 @@ module MonteCarloGlauber
 using Distributions
 using Random 
 using SpecialFunctions
-using SimpleNonlinearSolve
+using NonlinearSolve
 using StatsBase
 using StaticArrays
 using LinearAlgebra
