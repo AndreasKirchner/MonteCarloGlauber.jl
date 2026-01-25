@@ -17,7 +17,7 @@ using Test
     end
 
     @testset "IntegratedWoodSaxon basics" begin
-        bb = IntegratedWoodSaxon(4, 0.6, 5.0, 1.0, 0.0, true, 1e-3, rng, 10)
+        bb = IntegratedWoodSaxon(4, 0.6, 5.0, 1.0, 0.0, true, 1.0e-3, rng, 10)
         @test size(bb) == (4, 2)
         @test eltype(bb) == Float64
 
@@ -27,7 +27,7 @@ using Test
     end
 
     @testset "IntegratedWoodSaxonInterp basics" begin
-        cc = IntegratedWoodSaxonInterp(4, 0.6, 5.0, 1.0, 0.0, 10, 1e-3, 10, rng, true)
+        cc = IntegratedWoodSaxonInterp(4, 0.6, 5.0, 1.0, 0.0, 10, 1.0e-3, 10, rng, true)
         @test size(cc) == (4, 2)
         @test eltype(cc) == Float64
 
@@ -37,7 +37,7 @@ using Test
     end
 
     @testset "Threaded wrapper" begin
-        base = IntegratedWoodSaxon(4, 0.6, 5.0, 1.0, 0.0, true, 1e-3, rng, 10)
+        base = IntegratedWoodSaxon(4, 0.6, 5.0, 1.0, 0.0, true, 1.0e-3, rng, 10)
         dd = Threaded(base, 2)
         @test size(dd) == (4, 2)
         @test eltype(dd) == Float64
@@ -62,6 +62,6 @@ using Test
 
     @testset "InverseFunction" begin
         invf = InverseFunction(x -> 2 * x)
-        @test isapprox(invf(4.0), 2.0; atol=1e-6)
+        @test isapprox(invf(4.0), 2.0; atol = 1.0e-6)
     end
 end
