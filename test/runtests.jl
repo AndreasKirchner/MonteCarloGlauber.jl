@@ -60,6 +60,42 @@ using Test
         @test isfinite(y_cm)
     end
 
+    @testset "Participants sampling" begin
+        n1 = NucleiWoodSaxon3D(rng, 4, 0.6, 5.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10, 0.0)
+        n2 = NucleiWoodSaxon3D(rng, 4, 0.6, 5.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10, 0.0)
+
+        participants = Participants(n1, n2, 0.5, 200.0, 1.0, 0.0; Nr = 8, Nth = 8)
+        event = rand(rng, participants)
+
+        @test event isa Participant
+        @test event.n_coll > 0
+        @test impactParameter(event) == event.b
+        @test multiplicity(event) == event.multiplicity
+        @test length(event.part1) <= n1.N_nucleon
+        @test length(event.part2) <= n2.N_nucleon
+
+        bmax = 3 * (n1.R + n2.R) + 6 * 0.5
+        @test 0.0 <= event.b <= bmax
+    end
+
+    @testset "Centralities selection" begin
+        function fake_participant(mult)
+            part1 = [SVector(0.0, 0.0)]
+            part2 = [SVector(0.0, 0.0)]
+            shape1 = [1.0]
+            shape2 = [1.0]
+            return Participant(part1, part2, shape1, shape2, 1, 0.5, 1.0, 0.0, 1.0, 1.0, 0.0, mult)
+        end
+
+        events = [fake_participant(mult) for mult in 100.0:-1.0:1.0]
+        borders = centralities_selection(events; threaded = false)
+
+        @test length(borders) == 100
+        @test borders[1] == 100.0
+        @test borders[end] == 1.0
+        @test issorted(borders, rev = true)
+    end
+
     @testset "InverseFunction" begin
         invf = InverseFunction(x -> 2 * x)
         @test isapprox(invf(4.0), 2.0; atol = 1.0e-6)
