@@ -85,4 +85,4 @@ function Distributions._rand!(rng::AbstractRNG, s::IntegratedWoodSaxonInterp{T, 
     end
 
 
-end 
+end

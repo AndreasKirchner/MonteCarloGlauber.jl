@@ -109,4 +109,4 @@ function Distributions._rand!(rng::AbstractRNG, s::NucleiWoodSaxon3D{T, R, C, W,
 
     end
 
-end 
+end
