@@ -1,5 +1,3 @@
-
-
 struct TabulatedEvent{B} <: Sampleable{ArrayLikeVariate{2}, Continuous}
     N_nucleon::Int64
     N_configs::Int64
