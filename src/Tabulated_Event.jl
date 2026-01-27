@@ -22,7 +22,7 @@ function TabulatedEvent(filename)
             )
         )
     )
-    #TabulatedEvent(size(configs)[2],size(configs)[3],radius,filename,Float64.(read(configs)),true)
+
     N_nucleon = size(configs)[2]
     N_configs = size(configs)[3]
     array = Float64.(read(configs))
@@ -43,9 +43,7 @@ function Distributions._rand!(rng::AbstractRNG, s::TabulatedEvent{B}, x::DenseMa
     rotmatrix = rand(rng, RotMatrix{3})
     config = s.array[:, :, index]
     for i in Base.axes(x, 1)
-        #@show i
         rot = rotmatrix * config
-        #@show rot
         for j in Base.axes(x, 2)
             x[i, j] = rot[j, i]
         end

@@ -12,7 +12,7 @@ After this one can use the package simply by using
 using MonteCarloGlauber
 ```
 
-## Basic Expample 
+## Basic Example 
 ```julia
 using Statistics
 using MonteCarloGlauber
