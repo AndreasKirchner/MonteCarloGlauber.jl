@@ -206,21 +206,21 @@ function centralities_selection_CoM(events::Vector{T}, bins; Threaded = true) wh
     #return centrality_borders
 end
 
-function centralities_selection_events(events::Vector{T},bins; Threaded=true ) where {T<:Participant}
+function centralities_selection_events(events::Vector{T}, bins; Threaded = true) where {T <: Participant}
 
-     if Threaded 
-        multi=tmap(events)   do x 
-           center_of_mass(x)
-       end
-        mult=tmap(m->m[1],multi)
-        #com1=tmap(m->m[2],multi)
-        #com2=tmap(m->m[3],multi)
-    else 
-
-        multi=map(events)   do x 
+    if Threaded
+        multi = tmap(events) do x
             center_of_mass(x)
         end
-        mult=map(m->m[1],multi)
+        mult = tmap(m -> m[1], multi)
+        #com1=tmap(m->m[2],multi)
+        #com2=tmap(m->m[3],multi)
+    else
+
+        multi = map(events) do x
+            center_of_mass(x)
+        end
+        mult = map(m -> m[1], multi)
         #com1=map(m->m[2],multi)
         #com2=map(m->m[3],multi)
     end
@@ -798,20 +798,20 @@ function generate_bg_twpt_fct(f, delta_factor, norm, Projectile1, Projectile2, w
     else
         events = rand(participants, minBiasEvents)
     end
-    batches = centralities_selection_events(events,bins;Threaded=Threaded)
-    bg = generate_bg(batches,bins,r_grid,f,norm;NumPhiPoints=NumPhiPoints)
-    TwPtEntropy = generate_tw_pt_fct_entropy(batches,bins,r_grid,mList,norm;NumPhiPoints=NumPhiPoints,Nfields=Nfields)
-    tw_pt_entropy = generate_tw_pt_fct_entropy(batches,bins,r_grid,mList,norm;NumPhiPoints=NumPhiPoints,Nfields=Nfields)
-    
-    for cc in 1:length(batches)-1 #TODO put this in own function
+    batches = centralities_selection_events(events, bins; Threaded = Threaded)
+    bg = generate_bg(batches, bins, r_grid, f, norm; NumPhiPoints = NumPhiPoints)
+    TwPtEntropy = generate_tw_pt_fct_entropy(batches, bins, r_grid, mList, norm; NumPhiPoints = NumPhiPoints, Nfields = Nfields)
+    tw_pt_entropy = generate_tw_pt_fct_entropy(batches, bins, r_grid, mList, norm; NumPhiPoints = NumPhiPoints, Nfields = Nfields)
+
+    for cc in 1:(length(batches) - 1) #TODO put this in own function
         for m in 1:length(mList)
             for r1 in 1:length(r_grid)
                 for r2 in r1:length(r_grid)
-                    correlator[cc,1,1,1,m,r1,r2]=tw_pt_entropy[cc,1,1,1,m,r1,r2]*delta_factor(bg[cc,r1])*delta_factor(bg[cc,r2])
-                    correlator[cc,1,1,1,m,r2,r1]=correlator[cc,1,1,1,m,r1,r2]
+                    correlator[cc, 1, 1, 1, m, r1, r2] = tw_pt_entropy[cc, 1, 1, 1, m, r1, r2] * delta_factor(bg[cc, r1]) * delta_factor(bg[cc, r2])
+                    correlator[cc, 1, 1, 1, m, r2, r1] = correlator[cc, 1, 1, 1, m, r1, r2]
                 end
             end
         end
     end
-    return bg,correlator 
+    return bg, correlator
 end
