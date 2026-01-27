@@ -2,9 +2,9 @@ module MonteCarloGlauber
 
 # Write your package code here.
 using Distributions
-using Random 
+using Random
 using SpecialFunctions
-using SimpleNonlinearSolve
+using NonlinearSolve
 using StatsBase
 using StaticArrays
 using LinearAlgebra
@@ -18,8 +18,6 @@ using DelimitedFiles
 using HDF5
 using FastGaussQuadrature
 using Statistics
-
-
 
 
 include("Metropolis_Hastings.jl")
@@ -77,8 +75,8 @@ bg, finalCorr = generate_bg_two_pt_fct(
 #function generate_bg_two_pt_fct
 #end
 
-export NucleiWoodSaxon3D,IntegratedWoodSaxonInterp,IntegratedWoodSaxon, Participants, Participant, threaded, Threaded, rand, TabulatedEvent
-export impactParameter ,multiplicity,center_of_mass,centralities_selection
+export NucleiWoodSaxon3D, IntegratedWoodSaxonInterp, IntegratedWoodSaxon, Participants, Participant, threaded, Threaded, rand, TabulatedEvent
+export impactParameter, multiplicity, center_of_mass, centralities_selection
 
 export InverseFunction
 

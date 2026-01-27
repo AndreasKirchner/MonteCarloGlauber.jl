@@ -1,74 +1,103 @@
 using MonteCarloGlauber
-#using Test
-#using StaticArrays
-#=
+using Random
+using StaticArrays
+using Test
+
 @testset "MonteCarloGlauber.jl" begin
-    aa=NucleiWoodSaxon3D(10, 1.5, 5., 1., 0., 0., 0., 0., 0.)
-    bb=IntegratedWoodSaxon(10,1,5.,1.,0.)
-    cc=IntegratedWoodSaxonInterp(10,1,5.,1.,0.)
-    dd=threaded(aa)
-    ee=Threaded(aa,Threads.nthreads())
-    ff=Threaded(aa,10*Threads.nthreads())  
-    
-    @test size(aa) == (10,2)
-    @test eltype(aa) == Float64
-    @test size(bb) == (10,2)
-    @test eltype(bb) == Float64
-    @test size(cc) == (10,2)
-    @test eltype(cc) == Float64
-    @test size(dd) == (10,2)    
+    rng = MersenneTwister(1234)
 
-    @test eltype(dd) == Float64
-    @test size(ee) == (10,2)
-    @test eltype(ee) == Float64
-    @test size(ff) == (10,2)
-    @test eltype(ff) == Float64 
-    
-    #rng=Random.default_rng()
-    #@test rand(rng,aa,100) isa Matrix{Float64}
-    #@test rand(rng,bb,100) isa Matrix{Float64}
-    #@test rand(rng,cc,100) isa Matrix{Float64}
-    #@test rand(rng,dd,100) isa Matrix{Float64}
-    #@test rand(rng,ee,100) isa Matrix{Float64}
-    #@test rand(rng,ff,100) isa Matrix{Float64}  
-    #
-    #@test rand(rng,aa) isa Matrix{Float64}
-    #@test rand(rng,bb) isa Matrix{Float64}    
-    #@test rand(rng,cc) isa Matrix{Float64}
-    #@test rand(rng,dd) isa Matrix{Float64}      
-    #@test rand(rng,ee) isa Matrix{Float64}
-    #@test rand(rng,ff) isa Matrix{Float64}        
-    =#
-#
-    #event=Participants(aa,aa,1,1,6.4,1,0)
-#
-    #
-    #
-    #@test rand(rng,event,100) isa Vector{Array{Float64,2}}
-    #@test rand(rng,event) isa Array{Float64,2}
+    @testset "NucleiWoodSaxon3D basics" begin
+        aa = NucleiWoodSaxon3D(rng, 4, 0.6, 5.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10, 0.0)
+        @test size(aa) == (4, 2)
+        @test eltype(aa) == Float64
 
-    #@test rand(aa,100) isa Matrix{Float64}
-    #@test rand(bb,100) isa Matrix{Float64}
-    #@test rand(cc,100) isa Matrix{Float64}
-    #@test rand(dd,100) isa Matrix{Float64}
-    #@test rand(ee,100) isa Matrix{Float64}
-    #@test rand(ff,100) isa Matrix{Float64}  
-    
-    #@test rand(aa) isa Matrix{Float64}
-    #@test rand(bb) isa Matrix{Float64}     
-    #@test rand(cc) isa Matrix{Float64}
-    #@test rand(dd) isa Matrix{Float64}      
-    #@test rand(ee) isa Matrix{Float64}
-    #@test rand(ff) isa Matrix{Float64}        
+        sample = rand(rng, aa)
+        @test size(sample) == (4, 2)
+        @test eltype(sample) == Float64
+    end
 
-    #event=Participants(aa,aa,1,1,6.4,1,0)
+    @testset "IntegratedWoodSaxon basics" begin
+        bb = IntegratedWoodSaxon(4, 0.6, 5.0, 1.0, 0.0, true, 1.0e-3, rng, 10)
+        @test size(bb) == (4, 2)
+        @test eltype(bb) == Float64
 
-    
-    
-    #@test rand(event,100)[4].part1 isa Vector{SVector{2,Float64}}
-    #@test rand(event,100)[4].part2 isa Vector{SVector{2,Float64}}
-    #@test rand(event).part1 isa Vector{SVector{2,Float64}}
-    #@test rand(event).part2 isa Vector{SVector{2,Float64}}
-#TODO how to add package to test?
+        sample = rand(rng, bb)
+        @test size(sample) == (4, 2)
+        @test eltype(sample) == Float64
+    end
 
-#end
+    @testset "IntegratedWoodSaxonInterp basics" begin
+        cc = IntegratedWoodSaxonInterp(4, 0.6, 5.0, 1.0, 0.0, 10, 1.0e-3, 10, rng, true)
+        @test size(cc) == (4, 2)
+        @test eltype(cc) == Float64
+
+        sample = rand(rng, cc)
+        @test size(sample) == (4, 2)
+        @test eltype(sample) == Float64
+    end
+
+    @testset "Threaded wrapper" begin
+        base = IntegratedWoodSaxon(4, 0.6, 5.0, 1.0, 0.0, true, 1.0e-3, rng, 10)
+        dd = Threaded(base, 2)
+        @test size(dd) == (4, 2)
+        @test eltype(dd) == Float64
+
+        sample = rand(rng, dd, 6)
+        @test size(sample) == (6,)
+        @test eltype(sample) == Matrix{Float64}
+    end
+
+    @testset "Participant helpers" begin
+        part1 = [SVector(0.0, 0.0), SVector(0.5, -0.25)]
+        part2 = [SVector(0.25, 0.25)]
+        shape1 = [1.0, 1.0]
+        shape2 = [1.0]
+        participant = Participant(part1, part2, shape1, shape2, 1, 0.5, 1.0, 0.0, 5.0, 5.0, 0.0, 1.0)
+
+        mult, x_cm, y_cm = center_of_mass(participant, 8, 8)
+        @test mult > 0
+        @test isfinite(x_cm)
+        @test isfinite(y_cm)
+    end
+
+    @testset "Participants sampling" begin
+        n1 = NucleiWoodSaxon3D(rng, 4, 0.6, 5.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10, 0.0)
+        n2 = NucleiWoodSaxon3D(rng, 4, 0.6, 5.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10, 0.0)
+
+        participants = Participants(n1, n2, 0.5, 200.0, 1.0, 0.0; Nr = 8, Nth = 8)
+        event = rand(rng, participants)
+
+        @test event isa Participant
+        @test event.n_coll > 0
+        @test impactParameter(event) == event.b
+        @test multiplicity(event) == event.multiplicity
+        @test length(event.part1) <= n1.N_nucleon
+        @test length(event.part2) <= n2.N_nucleon
+
+        bmax = 3 * (n1.R + n2.R) + 6 * 0.5
+        @test 0.0 <= event.b <= bmax
+    end
+
+    @testset "Centralities selection" begin
+        function fake_participant(mult)
+            part1 = [SVector(0.0, 0.0)]
+            part2 = [SVector(0.0, 0.0)]
+            shape1 = [1.0]
+            shape2 = [1.0]
+            return Participant(part1, part2, shape1, shape2, 1, 0.5, 1.0, 0.0, 1.0, 1.0, 0.0, mult)
+        end
+
+        events = [fake_participant(mult) for mult in 100.0:-1.0:1.0]
+        borders = centralities_selection(events; threaded = false)
+
+        @test length(borders) == 100
+        @test borders[1] == 100.0
+        @test borders[end] == 1.0
+        @test issorted(borders, rev = true)
+    end
+
+    @testset "InverseFunction" begin
+        invf = InverseFunction(x -> 2 * x)
+        @test isapprox(invf(4.0), 2.0; atol = 1.0e-6)
+    end
+end

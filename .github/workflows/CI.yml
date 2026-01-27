@@ -24,18 +24,18 @@ jobs:
       fail-fast: false
       matrix:
         version:
+          - '1.10'
           - '1.11'
-          - 'pre'
+          - '1.12'
         os:
           - ubuntu-latest
-        arch:
-          - x64
+          - macos-latest
+          - windows-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
-          arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
