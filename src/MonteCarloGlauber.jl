@@ -82,7 +82,7 @@ export impactParameter ,multiplicity,center_of_mass,centralities_selection
 
 export InverseFunction
 
-export Uranium, Lead, Gold, Copper, Xenon 
+export Uranium, Lead, Gold, Copper, Xenon, generate_bg_twpt_fct
 
 export generate_bg_two_pt_fct
 
