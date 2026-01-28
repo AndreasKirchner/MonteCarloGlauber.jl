@@ -90,7 +90,7 @@ end
 
 
 """
-    eccentricities(con; Nr=100, Nth=50) 
+    eccentricities(con; Nr=100, Nth=50) deprecated
 
 Calculate the eccentricities for a given participant configuration.
 
@@ -135,7 +135,7 @@ Non-allocating variant for eccentricities using pre-computed cache.
 function eccentricities_gl!(con::T, cache) where {T <: Participant}
     r_vals, r_weights, sinθ, cosθ = cache.r_vals, cache.r_weights, cache.sinθ, cache.cosθ
 
-    result = @SVector zeros(eltype(con), 6)
+    result = @SVector zeros(eltype(con), 11)
 
     @inbounds for j in eachindex(sinθ)
         s, c = sinθ[j], cosθ[j]
@@ -145,14 +145,34 @@ function eccentricities_gl!(con::T, cache) where {T <: Participant}
             x = r * c
             y = r * s
             m = con(x, y) * w
-            result = result + SVector{6}(m, m * x, m * y, m * x^2, m * y^2, m * x * y)
+            result = result + SVector{11}(m, m * x, m * y, m * x^2, m * y^2, m * x * y, m * x^3, m * y^3, m * x^2 * y, m * x * y^2, m * (x^2 + y^2)^(1.5))
         end
     end
 
     return result
 end
+"""
+    eps2(ecc_single_event)
 
+Compute (magnitude ϵ_2, angle ϵ_2) from a result of eccentricities_gl!
+"""
+function eps2(ecc_single_event)
+    term1 = ecc_single_event[4]-ecc_single_event[5]
+    term2 = 2*ecc_single_event[6]
+    term3 = ecc_single_event[4]+ecc_single_event[5]
+    return sqrt(term1^2+term2^2)/term3, atan(term2, term1)
+end
+"""
+    eps3(ecc_single_event)
 
+Compute (magnitude ϵ_3, angle ϵ_3) from a result of eccentricities_gl!
+"""
+function eps3(ecc_single_event)
+    term1 = ecc_single_event[8]-3*ecc_single_event[9]
+    term2 = 3*ecc_single_event[10]-ecc_single_event[7]
+    term3 = ecc_single_event[11]
+    return sqrt(term1^2+term2^2)/term3, atan(term2, term1)
+end
 """
     centralities_selection(events; threaded=true) 
 
@@ -206,24 +226,7 @@ function centralities_selection_CoM(events::Vector{T}, bins; Threaded = true) wh
     #return centrality_borders
 end
 
-function centralities_selection_events(events::Vector{T}, bins; Threaded = true) where {T <: Participant}
-
-    if Threaded
-        multi = tmap(events) do x
-            center_of_mass(x)
-        end
-        mult = tmap(m -> m[1], multi)
-        #com1=tmap(m->m[2],multi)
-        #com2=tmap(m->m[3],multi)
-    else
-
-        multi = map(events) do x
-            center_of_mass(x)
-        end
-        mult = map(m -> m[1], multi)
-        #com1=map(m->m[2],multi)
-        #com2=map(m->m[3],multi)
-    end
+function centralities_selection_events(events::Vector{T}, bins, mult) where {T <: Participant}
 
     event_perm = sortperm(mult, rev = true)
     events_sorted = events[event_perm]

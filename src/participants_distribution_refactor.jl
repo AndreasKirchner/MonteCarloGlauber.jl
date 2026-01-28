@@ -13,8 +13,10 @@ struct Participant{T, S, V, M, C, D, F} <: ValueSupport
     multiplicity::Float64
 end
 
-impactParameter(x::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = x.b
-multiplicity(x::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = x.multiplicity
+impactParameter(x::Participant{T,S,V,M,C,D,F} ) where {T,S,V,M,C,D,F} = x.b
+multiplicity(x::Participant{T,S,V,M,C,D,F} ) where {T,S,V,M,C,D,F} = x.multiplicity
+n_coll(x::Participant{T,S,V,M,C,D,F} ) where {T,S,V,M,C,D,F} = x.n_coll
+
 
 Base.eltype(::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = promote_type(T, S)
 
@@ -211,7 +213,7 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
             #x_1=pos1rotshift[1]
             #y_1=pos1rotshift[2]
             @inbounds for nucl2 in axes(n2, 1)
-                pos2 = SVector{2}(n1[nucl2, 1], n2[nucl2, 2])
+                pos2 = SVector{2}(n2[nucl2, 1], n2[nucl2, 2])
                 # @show pos2
                 pos2rotshift = pos2 + b_vec
                 #x_2=pos2rotshift[1]
