@@ -13,9 +13,9 @@ struct Participant{T, S, V, M, C, D, F} <: ValueSupport
     multiplicity::Float64
 end
 
-impactParameter(x::Participant{T,S,V,M,C,D,F} ) where {T,S,V,M,C,D,F} = x.b
-multiplicity(x::Participant{T,S,V,M,C,D,F} ) where {T,S,V,M,C,D,F} = x.multiplicity
-n_coll(x::Participant{T,S,V,M,C,D,F} ) where {T,S,V,M,C,D,F} = x.n_coll
+impactParameter(x::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = x.b
+multiplicity(x::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = x.multiplicity
+n_coll(x::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = x.n_coll
 
 
 Base.eltype(::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = promote_type(T, S)

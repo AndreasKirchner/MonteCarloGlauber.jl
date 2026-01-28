@@ -157,10 +157,10 @@ end
 Compute (magnitude ϵ_2, angle ϵ_2) from a result of eccentricities_gl!
 """
 function eps2(ecc_single_event)
-    term1 = ecc_single_event[4]-ecc_single_event[5]
-    term2 = 2*ecc_single_event[6]
-    term3 = ecc_single_event[4]+ecc_single_event[5]
-    return sqrt(term1^2+term2^2)/term3, atan(term2, term1)
+    term1 = ecc_single_event[4] - ecc_single_event[5]
+    term2 = 2 * ecc_single_event[6]
+    term3 = ecc_single_event[4] + ecc_single_event[5]
+    return sqrt(term1^2 + term2^2) / term3, atan(term2, term1)
 end
 """
     eps3(ecc_single_event)
@@ -168,10 +168,10 @@ end
 Compute (magnitude ϵ_3, angle ϵ_3) from a result of eccentricities_gl!
 """
 function eps3(ecc_single_event)
-    term1 = ecc_single_event[8]-3*ecc_single_event[9]
-    term2 = 3*ecc_single_event[10]-ecc_single_event[7]
+    term1 = ecc_single_event[8] - 3 * ecc_single_event[9]
+    term2 = 3 * ecc_single_event[10] - ecc_single_event[7]
     term3 = ecc_single_event[11]
-    return sqrt(term1^2+term2^2)/term3, atan(term2, term1)
+    return sqrt(term1^2 + term2^2) / term3, atan(term2, term1)
 end
 """
     centralities_selection(events; threaded=true) 
