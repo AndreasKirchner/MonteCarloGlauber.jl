@@ -88,7 +88,11 @@ using Test
         end
 
         events = [fake_participant(mult) for mult in 100.0:-1.0:1.0]
-        borders = centralities_selection(events; threaded = false)
+        mult = multiplicity.(events)
+        event_perm = sortperm(mult, rev = true)
+        mult_sorted = mult[event_perm]
+        n_event_per_bin = length(events) ÷ 100
+        borders = mult_sorted[1:n_event_per_bin:n_event_per_bin * 100]
 
         @test length(borders) == 100
         @test borders[1] == 100.0

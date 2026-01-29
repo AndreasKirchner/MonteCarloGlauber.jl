@@ -139,6 +139,13 @@ end
 
 TBW Andreas put some comment
 """
+function split_vector_by_indices(vector, indices)
+    starts = vcat(1, indices .+ 1)
+    ends = vcat(indices, length(vector))
+    chunks = [vector[s:e] for (s, e) in zip(starts, ends) if s <= e]
+    return chunks
+end
+
 function centralities_selection_events(events::Vector{T}, bins) where {T <: Participant}
 
     mult = multiplicity.(events)
