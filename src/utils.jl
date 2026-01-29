@@ -135,7 +135,7 @@ Non-allocating variant for eccentricities using pre-computed cache.
 function eccentricities_gl!(con::T, cache) where {T <: Participant}
     r_vals, r_weights, sinθ, cosθ, θ_weight = cache.r_vals, cache.r_weights, cache.sinθ, cache.cosθ, cache.θ_weight
 
-    result = @SVector zeros(eltype(con), 11)
+    result = @SVector zeros(eltype(con), 6)
 
     @inbounds for j in eachindex(sinθ)
         s, c = sinθ[j], cosθ[j]
@@ -146,11 +146,15 @@ function eccentricities_gl!(con::T, cache) where {T <: Participant}
             x = r * c
             y = r * s
             m = con(x, y) * w * w_θ
-            result = result + SVector{11}(m, m * x, m * y, m * x^2, m * y^2, m * x * y, m * x^3, m * y^3, m * x^2 * y, m * x * y^2, m * (x^2 + y^2)^(1.5))
+            
+            #result = result + SVector{11}(m, m * x, m * y, m * x^2, m * y^2, m * x * y, m * x^3, m * y^3, m * x^2 * y, m * x * y^2, m * (x^2 + y^2)^(1.5))
+
+            result = result + SVector{6}(1, 2*c*s, (c^2-s^2), r, r * (3 * s - 4 * s^3), r * (4 * c^3 - 3 * c)) * m * r^2
+
         end
     end
 
-    return result
+    return sqrt(result[2]^2+result[3]^2)/result[1], atan(result[3], result[2]), sqrt(result[5]^2+result[6]^2)/result[4], atan(result[6], result[5])
 end
 """
     eps2(ecc_single_event)
