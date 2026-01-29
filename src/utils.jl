@@ -43,7 +43,7 @@ function prepare_accumulation(R1, R2, Nr = 64, Nth = 64)
 
     θ_weight = fill(Δθ, Nth)
 
-    return (r_vals = r_vals, r_weights = r_weights, sinθ = sinθ, cosθ = cosθ, θ_weight = θ_weight)
+    return (r_vals = r_vals, r_weights = r_weights, sinθ = sinθ, cosθ = cosθ, θ_weight = θ_weight,θ_vals=θ_vals)
 end
 
 prepare_accumulation(con::T, Nr = 64, Nth = 64) where {T <: Participant} = prepare_accumulation(con.R1, con.R2, Nr, Nth)
@@ -62,7 +62,7 @@ Non-allocating variant using pre-computed cache from `prepare_accumulation(con, 
 """
 function center_of_mass!(con::T, cache) where {T <: Participant}
     r_vals, r_weights, sinθ, cosθ, θ_weight = cache.r_vals, cache.r_weights, cache.sinθ, cache.cosθ, cache.θ_weight
-
+    θ_vals=cache.θ_vals
     mult = zero(eltype(con))
     x_cm = zero(eltype(con))
     y_cm = zero(eltype(con))
@@ -106,18 +106,19 @@ end
 
 function epsilon_n_psi_n!(con::T, cache, n) where {T <: Participant}
     r_vals, r_weights, sinθ, cosθ, θ_weight = cache.r_vals, cache.r_weights, cache.sinθ, cache.cosθ, cache.θ_weight
-
+    θ_vals=cache.θ_vals
     result = @SVector zeros(eltype(con), 3)
 
     @inbounds for j in eachindex(sinθ)
-        s, c = sinθ[j], cosθ[j]
+        
         w_θ = θ_weight[j]
+        sinnx,cosnx=sincos(n*θ_vals[i])
         @inbounds for i in eachindex(r_vals)
             r = r_vals[i]
             w = r_weights[i]
             m = con(x, y) * w * w_θ
-            cosnx, sinnx = cos_sin_n(c, s, n)
-
+            #cosnx, sinnx = cos_sin_n(c, s, n)
+    
             result = result + SVector{3}(1, cosnx, sinnx) * m * r^n
 
         end
