@@ -13,25 +13,11 @@ struct Participant{T, S, V, M, C, D, F} <: ValueSupport
     multiplicity::Float64
 end
 
-struct ParticipantMoments{T, S, V, M, C, D, F} <: ValueSupport
-    part1::Vector{SVector{2}{T}}
-    part2::Vector{SVector{2}{S}}
-    shape1::Vector{V}
-    shape2::Vector{M}
-    n_coll::Int64
-    sub_nucleon_width::C
-    shape_parameter::D
-    p::F
-    R1::Float64
-    R2::Float64
-    b::Float64
-    moments::Vector{Float64}
-end
 
 impactParameter(x::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = x.b
 multiplicity(x::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = x.multiplicity
 n_coll(x::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = x.n_coll
-n_part(x::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = length(x.part1)+length(x.part2)
+n_part(x::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = length(x.part1) + length(x.part2)
 
 
 Base.eltype(::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = promote_type(T, S)
@@ -198,7 +184,7 @@ end
     gasussd = 1 / (4 * w^2)
     #Tnn=gasussd*exp(-b^2*gasussd)
     #return 1-exp(-nucleos.sigma_gg*Tnn)
-    Tnn = gasussd * Base.Math.exp_fast(-b2 * gasussd)/pi
+    Tnn = gasussd * Base.Math.exp_fast(-b2 * gasussd) / pi
     return one(Tnn) - Base.Math.exp_fast(-nucleos.sigma_gg * Tnn)
 
 end
@@ -269,7 +255,7 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
             @inbounds for i in eachindex(r2)
                 r2[i] = r2[i] - r_cm
             end
-            
+
             return Participant(r1, r2, shape_1, shape_2, ncoll, nucleos.sub_nucleon_width, nucleos.shape_parameter, nucleos.p, R1, R2, b, mult)
         end
     end
