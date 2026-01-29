@@ -16,6 +16,7 @@ end
 impactParameter(x::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = x.b
 multiplicity(x::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = x.multiplicity
 n_coll(x::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = x.n_coll
+n_part(x::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = length(x.part1)+length(x.part2)
 
 
 Base.eltype(::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = promote_type(T, S)
@@ -182,7 +183,7 @@ end
     gasussd = 1 / (4 * w^2)
     #Tnn=gasussd*exp(-b^2*gasussd)
     #return 1-exp(-nucleos.sigma_gg*Tnn)
-    Tnn = gasussd * Base.Math.exp_fast(-b2 * gasussd)
+    Tnn = gasussd * Base.Math.exp_fast(-b2 * gasussd)/pi
     return one(Tnn) - Base.Math.exp_fast(-nucleos.sigma_gg * Tnn)
 
 end

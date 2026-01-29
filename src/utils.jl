@@ -133,18 +133,19 @@ end
 Non-allocating variant for eccentricities using pre-computed cache.
 """
 function eccentricities_gl!(con::T, cache) where {T <: Participant}
-    r_vals, r_weights, sinθ, cosθ = cache.r_vals, cache.r_weights, cache.sinθ, cache.cosθ
+    r_vals, r_weights, sinθ, cosθ, θ_weight = cache.r_vals, cache.r_weights, cache.sinθ, cache.cosθ, cache.θ_weight
 
     result = @SVector zeros(eltype(con), 11)
 
     @inbounds for j in eachindex(sinθ)
         s, c = sinθ[j], cosθ[j]
+        w_θ = θ_weight[j]
         @inbounds for i in eachindex(r_vals)
             r = r_vals[i]
             w = r_weights[i]
             x = r * c
             y = r * s
-            m = con(x, y) * w
+            m = con(x, y) * w * w_θ
             result = result + SVector{11}(m, m * x, m * y, m * x^2, m * y^2, m * x * y, m * x^3, m * y^3, m * x^2 * y, m * x * y^2, m * (x^2 + y^2)^(1.5))
         end
     end
