@@ -116,8 +116,6 @@ function epsilon_n_psi_n!(con::T, cache, n) where {T <: Participant}
             r = r_vals[i]
             w = r_weights[i]
             m = con(x, y) * w * w_θ
-
-
             cosnx, sinnx = cos_sin_n(c, s, n)
 
             result = result + SVector{3}(1, cosnx, sinnx) * m * r^n
