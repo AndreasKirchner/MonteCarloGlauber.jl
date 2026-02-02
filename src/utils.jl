@@ -249,7 +249,6 @@ function centralities_selection_events(events::Vector{T}, bins) where {T <: Part
 end
 
 
-
 """
     construct_trento_names(part; extensionString = "dat", mMode = "2", cc = "0-100", path = "./")
 
