@@ -109,8 +109,14 @@ and the two point function
 ```julia
 heatmap(twpt[1,1,1,1,1,:,:])
 ```
-The usage of light ions is also possible with the only needed modification in the projectile definition
+The usage of light ions is also possible with the only needed modification in the projectile definition.
+This package ships light-ion configurations as an artifact, so you can use the built-in helpers:
 ```julia
-n1=TabulatedEvent("NLEFT_dmin_0.5fm_negativeweights_Ne.h5")
+n1 = Neon()
+n2 = Oxigen()
 ```
-with TabulatedEvent being the file of possible neon configurations in this case.
+If you want to load a specific file directly, you can still do:
+```julia
+n1 = TabulatedEvent(joinpath(MonteCarloGlauber.root_light_ion, "NLEFT_dmin_0.5fm_negativeweights_Ne.h5"))
+```
+where `root_light_ion` points to the installed artifact directory.

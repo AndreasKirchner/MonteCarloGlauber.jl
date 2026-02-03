@@ -17,7 +17,7 @@ function Xenon()
     return NucleiWoodSaxon3D(129, 0.59, 5.36, 1, 0, 0.0, 0.0, 0.0, 0.0)
 end
 
-function Oxign()
+function Oxigen()
     return TabulatedEvent(joinpath(root_light_ion,"NLEFT_dmin_0.5fm_negativeweights_O.h5"))
 end
 

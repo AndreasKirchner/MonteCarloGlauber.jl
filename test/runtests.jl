@@ -78,6 +78,29 @@ using Test
         @test 0.0 <= event.b <= bmax
     end
 
+    @testset "Light ion tabulated events" begin
+        oxygen = Oxigen()
+        neon = Neon()
+
+        @test oxygen isa TabulatedEvent
+        @test neon isa TabulatedEvent
+        @test isfile(oxygen.name)
+        @test isfile(neon.name)
+        @test oxygen.N_nucleon > 0
+        @test neon.N_nucleon > 0
+        @test oxygen.N_configs > 0
+        @test neon.N_configs > 0
+        @test size(oxygen) == (oxygen.N_nucleon, 2)
+        @test size(neon) == (neon.N_nucleon, 2)
+
+        sample_o = rand(rng, oxygen)
+        sample_n = rand(rng, neon)
+        @test size(sample_o) == (oxygen.N_nucleon, 2)
+        @test size(sample_n) == (neon.N_nucleon, 2)
+        @test eltype(sample_o) == Float64
+        @test eltype(sample_n) == Float64
+    end
+
     @testset "Centralities selection" begin
         function fake_participant(mult)
             part1 = [SVector(0.0, 0.0)]
