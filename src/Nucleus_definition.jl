@@ -18,9 +18,9 @@ function Xenon()
 end
 
 function Oxigen()
-    return TabulatedEvent(joinpath(root_light_ion,"NLEFT_dmin_0.5fm_negativeweights_O.h5"))
+    return TabulatedEvent(joinpath(root_light_ion, "NLEFT_dmin_0.5fm_negativeweights_O.h5"))
 end
 
 function Neon()
-    return TabulatedEvent(joinpath(root_light_ion,"NLEFT_dmin_0.5fm_negativeweights_Ne.h5"))
+    return TabulatedEvent(joinpath(root_light_ion, "NLEFT_dmin_0.5fm_negativeweights_Ne.h5"))
 end
