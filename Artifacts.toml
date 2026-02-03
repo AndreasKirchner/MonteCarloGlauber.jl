@@ -1,5 +1,5 @@
 [light_ion_conf]
-git-tree-sha1 = "00df214b6fb102e29d468a6fbdb4dd9cd1a1a27b"
+git-tree-sha1 = "b4e2c67004f410d43299dc0e2b2c801f67afbcf1"
 
     [[light_ion_conf.download]]
     sha256 = "c0c748db819740340aaf939f731b1a2cf7699abbc8d9d0eec794db8b1123cdd4"
