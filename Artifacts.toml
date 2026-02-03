@@ -1,0 +1,6 @@
+[light_ion_conf]
+git-tree-sha1 = "00df214b6fb102e29d468a6fbdb4dd9cd1a1a27b"
+
+    [[light_ion_conf.download]]
+    sha256 = "c0c748db819740340aaf939f731b1a2cf7699abbc8d9d0eec794db8b1123cdd4"
+    url = "https://gist.githubusercontent.com/fafafrens/24c36d3209c976711f5db7c47ddd2a4b/raw/2d3985253cbc81063101898f30b00b3af5961bbe/light_ion_conf.tar.gz"

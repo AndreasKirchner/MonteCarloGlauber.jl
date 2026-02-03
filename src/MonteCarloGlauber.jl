@@ -18,6 +18,7 @@ using DelimitedFiles
 using HDF5
 using FastGaussQuadrature
 using Statistics
+using Artifacts
 
 
 include("Metropolis_Hastings.jl")
@@ -74,6 +75,9 @@ bg, finalCorr = generate_bg_two_pt_fct(
 #
 #function generate_bg_two_pt_fct
 #end
+
+const root_light_ion = artifact"light_ion_conf"
+
 
 export NucleiWoodSaxon3D, IntegratedWoodSaxonInterp, IntegratedWoodSaxon, Participants, Participant, threaded, Threaded, rand, TabulatedEvent
 export impactParameter, multiplicity, center_of_mass, centralities_selection

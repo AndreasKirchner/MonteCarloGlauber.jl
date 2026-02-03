@@ -4,6 +4,7 @@ version = "1.0.0-DEV"
 authors = ["Eduardo Grossi", "Andreas Kirchner"]
 
 [deps]
+Artifacts = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 DifferentiationInterface = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
@@ -24,6 +25,7 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
+Artifacts = "1.11.0"
 DelimitedFiles = "1"
 DifferentiationInterface = "0.7"
 Distributions = "0.25"
