@@ -2,6 +2,10 @@
 
 [![Build Status](https://github.com/AndreasKirchner/MonteCarloGlauber.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/AndreasKirchner/MonteCarloGlauber.jl/actions/workflows/CI.yml?query=branch%3Amain)
 
+The MonteCarloGlauber.jl package is a tool to simulate initial conditions for heavy-ion collisions based on the Glauber model.
+
+##Installation 
+
 To install the package and its dependencies one can use 
 ```julia
 import Pkg
@@ -12,46 +16,58 @@ After this one can use the package simply by using
 using MonteCarloGlauber
 ```
 
-## Basic Example 
+## Basic Usage 
 ```julia
 using Statistics
 using MonteCarloGlauber
 using Plots
 
-n1= Lead()
-n2= Lead()
+# Create lead nuclei
+n1 = Lead()
+n2 = Lead()
+# Collision parameters
+w = 0.5          # nucleon width
+s_NN = 2760      # Center-of-mass energy (GeV)
+k = 1            # fluctuation parameter
+p = 0.             # reduced thickness parameter
+b = (1,2)          # impact parameter (optional)
 ```
-This defines the two nuclei. Asymmetric collision, e.g. Lead and Uranium are also possible. The nucleons inside the nuclei are sampled via
-```julia
-rand(n1)
-rand(n2)
-```
-Each will sample a matrix $(A,2)$ where $A$ is the mass number and 2 are the x and y positions of the nucleons. To sample more configurations, one can use
-```julia
-rand(n1,100)
-```
-, which generates 100 events in a vector. 
-The rand mutates the state of the nucleus, so it is generically not threadsafe. However, there exists a function that makes a copy in each thread and safely evaluates the rand on each thread. 
-```julia
-rand(threaded(n1),100)
-```
-The Monte Carlo Glauber model is specified by the parameters
-```julia
-w= 1
-s_NN=5000
-k=1
-p=0.
-b=(1,2)
-```
+This defines the two nuclei and the collision parameters. Asymmetric collision, e.g. Lead and Uranium are also possible.
 To sample the event, we first create a struct 
 ```julia
-participants=Participants(n1,n2,w,s_NN,k,p,b)
+participants = Participants(n1,n2,w,s_NN,k,p,b)
 ```
-, in which case the impact parameter range is specified. If b is not specified, one creates minimum bias events. The minimum bias events are then sampled via
+, in case the impact parameter range is specified. If b is not specified, one creates minimum bias events. The minimum bias events are then sampled via
 ```julia
-participants=threaded(Participants(n1,n2,w,s_NN,k,p))
-event=rand(participants,1000)
+Nev = 1000
+participants = threaded(Participants(n1,n2,w,s_NN,k,p))
+evt = rand(participants,Nev)
 ```
+One can extract basic collision properties such as total entropy (in a.u.), number of binary collisions, number of participants and impact parameter with
+```julia
+mult = map(evt) do x
+    x.multiplicity
+end
+
+n_coll = map(evt) do x
+    x.n_coll
+end
+
+Npart = map(evt) do x
+    MonteCarloGlauber.n_part(x)
+end
+
+b = map(evt) do x
+    impactParameter(x)
+end
+
+# Plot distributions
+histogram(b, bins = 10)
+histogram(mult, bins = 10, yscale = :log10)
+histogram(n_coll, bins = 10)
+
+```
+
 With the events sampled we can now compute things such as the impact parameter histogram
 ```julia
 b_event=map(event) do x
