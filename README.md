@@ -104,7 +104,7 @@ n2 = Oxigen()
 If you want to load a specific file directly, you can still do:
 ```julia
 n1 = TabulatedEvent(joinpath(MonteCarloGlauber.root_light_ion, "NLEFT_dmin_0.5fm_negativeweights_Ne.h5"))
-```julia
+```
 where `root_light_ion` points to the installed artifact directory.
 
 ## Centraliy seclection 
