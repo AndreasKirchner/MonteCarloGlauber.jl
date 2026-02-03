@@ -4,19 +4,19 @@
 
 The MonteCarloGlauber.jl package is a tool to simulate initial conditions for heavy-ion collisions based on the Glauber model.
 
-## Installation 
+## Installation
 
-To install the package and its dependencies one can use 
+To install the package and its dependencies, run:
 ```julia
 import Pkg
 Pkg.add(url = "https://github.com/AndreasKirchner/MonteCarloGlauber.jl")
 ```
-After this one can use the package simply by using 
+Then load the package with:
 ```julia
 using MonteCarloGlauber
 ```
 
-## Basic Usage 
+## Basic Usage
 ```julia
 using Statistics
 using MonteCarloGlauber
@@ -32,18 +32,18 @@ k = 1            # fluctuation parameter
 p = 0.             # reduced thickness parameter
 b = (1,2)          # impact parameter (optional)
 ```
-This defines the two nuclei and the collision parameters. Asymmetric collision, e.g. Lead and Uranium are also possible.
-To sample the event, we first create a struct 
+This defines the two nuclei and the collision parameters. Asymmetric collisions, e.g. Lead and Uranium, are also possible.
+To sample events, we first create a struct:
 ```julia
 participants = Participants(n1,n2,w,s_NN,k,p,b)
 ```
-, in case the impact parameter range is specified. If b is not specified, one creates minimum bias events. The minimum bias events are then sampled via
+If `b` is specified, the impact parameter range is used. If `b` is not specified, minimum-bias events are generated. The minimum-bias events are then sampled via:
 ```julia
 Nev = 1000
 participants = threaded(Participants(n1,n2,w,s_NN,k,p))
 evt = rand(participants,Nev)
 ```
-One can extract basic collision properties such as total entropy (in a.u.), number of binary collisions, number of participants and impact parameter with
+You can extract basic collision properties such as total entropy (a.u.), number of binary collisions, number of participants, and impact parameter with:
 ```julia
 mult = map(evt) do x
     x.multiplicity
@@ -68,7 +68,7 @@ histogram(n_coll, bins = 10)
 
 ```
 
-We can also plot the events by evaluating them on a grid
+We can also plot the events by evaluating them on a grid:
 ```julia
 profile=map(evt)   do x 
     map(Iterators.product(-10:0.5:10,-10:0.5:10)) do y
@@ -77,25 +77,25 @@ profile=map(evt)   do x
 end
 heatmap(-10:0.5:10,-10:0.5:10,profile[1])
 ```
-It is also possible to generate the background configuration and two point correlation function used in the FluiduM code via
+It is also possible to generate the background configuration and two-point correlation function used in the FluiduM code via:
 ```julia
 fmGeV=5 # conversion factor for units
 entropy(T)=47.5*4*T^3*pi^2/90*fmGeV^3 #entropy as function of temperature
 entropyToTemp(T)=InverseFunction(entropy)(T) #inverse, i.e. T(s)
-dSdT(T)=1/(3*47.5*4*T^2*pi^2/90*fmGeV^2) #function to convert perturbations as function of bg temp, i.e. dT/ds(T_0)
+dSdT(T)=1/(3*47.5*4*T^2*pi^2/90*fmGeV^2) #function to convert perturbations as function of background temp, i.e. dT/ds(T_0)
 bg,twpt=generate_bg_two_pt_fct(entropyToTemp,dSdT,1,Lead(),Lead(),w,k,p,s_NN,[10,20],[2];minBiasEvents=1000,r_grid=0:1:10,nFields=10,n_ext_Grid=100)
 
 ```
-We can also plot the background
+We can also plot the background:
 ```julia
 plot(0:1:10,bg[1])
 plot!(0:1:10,bg[2])
 ```
-and the two point function
+and the two-point function:
 ```julia
 heatmap(twpt[1,1,1,1,1,:,:])
 ```
-The usage of light ions is also possible with the only needed modification in the projectile definition.
+The usage of light ions is also possible with only a small modification in the projectile definition.
 This package ships light-ion configurations as an artifact, so you can use the built-in helpers:
 ```julia
 n1 = Neon()
@@ -104,29 +104,29 @@ n2 = Oxigen()
 If you want to load a specific file directly, you can still do:
 ```julia
 n1 = TabulatedEvent(joinpath(MonteCarloGlauber.root_light_ion, "NLEFT_dmin_0.5fm_negativeweights_Ne.h5"))
-```julia
+```
 where `root_light_ion` points to the installed artifact directory.
 
-## Centraliy seclection 
-We create two nuclei 
+## Centrality selection
+We create two nuclei:
 ```julia
 n1 = Oxigen()
 n2 = Oxigen()
 ```
-we select some parameter 
+We set some parameters:
 ```julia
 w = 0.5          # nucleon width
 s_NN = 2760      # Center-of-mass energy (GeV)
 k = 1            # fluctuation parameter
 p = 0.0             # reduced thickness parameter
 ```
-We generate 10^6 event in multithreaed way 
+We generate 10^6 events in a multithreaded way:
 ```julia
 Nev = 1_000_000
 participants = threaded(Participants(n1, n2, w, s_NN, k, p))
 evt = rand(participants, Nev)
 ```
-We compute some informative quantity as before 
+We compute some observables as before:
 ```julia
 mult = multiplicity.(evt)
 n_coll = map(evt) do x
@@ -135,7 +135,7 @@ end
 Npart = MonteCarloGlauber.n_part.(evt)
 b = impactParameter.(evt)
 ```
-this function select the event that for a given bercentile 
+This function selects events for a given percentile:
 ```julia
 function centrality_indices_by_rank(mult, bins)
     n = length(mult)
@@ -149,7 +149,7 @@ function centrality_indices_by_rank(mult, bins)
     return out
 end
 ```
-select the bin divide and plot the first centrality 
+Select the bin edges and plot the first centrality class:
 ```julia
 bins = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 idx_bins = centrality_indices_by_rank(mult, bins)
