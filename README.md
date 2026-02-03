@@ -104,5 +104,54 @@ n2 = Oxigen()
 If you want to load a specific file directly, you can still do:
 ```julia
 n1 = TabulatedEvent(joinpath(MonteCarloGlauber.root_light_ion, "NLEFT_dmin_0.5fm_negativeweights_Ne.h5"))
-```
+```julia
 where `root_light_ion` points to the installed artifact directory.
+
+## Centraliy seclection 
+We create two nuclei 
+```julia
+n1 = Oxigen()
+n2 = Oxigen()
+```
+we select some parameter 
+```julia
+w = 0.5          # nucleon width
+s_NN = 2760      # Center-of-mass energy (GeV)
+k = 1            # fluctuation parameter
+p = 0.0             # reduced thickness parameter
+```
+We generate 10^6 event in multithreaed way 
+```julia
+Nev = 1_000_000
+participants = threaded(Participants(n1, n2, w, s_NN, k, p))
+evt = rand(participants, Nev)
+```
+We compute some informative quantity as before 
+```julia
+mult = multiplicity.(evt)
+n_coll = map(evt) do x
+    x.n_coll
+end
+Npart = MonteCarloGlauber.n_part.(evt)
+b = impactParameter.(evt)
+```
+this function select the event that for a given bercentile 
+```julia
+function centrality_indices_by_rank(mult, bins)
+    n = length(mult)
+    order = sortperm(mult, rev = true)  # highest mult = most central
+    out = Vector{Vector{Int}}(undef, length(bins) - 1)
+    for (i, (lo, hi)) in enumerate(zip(bins[1:(end - 1)], bins[2:end]))
+        lo_i = floor(Int, n * lo / 100) + 1
+        hi_i = floor(Int, n * hi / 100)
+        out[i] = order[lo_i:hi_i]
+    end
+    return out
+end
+```
+select the bin divide and plot the first centrality 
+```julia
+bins = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+idx_bins = centrality_indices_by_rank(mult, bins)
+histogram(multiplicity.(evt[idx_bins[1]]), bins = 100)
+```
