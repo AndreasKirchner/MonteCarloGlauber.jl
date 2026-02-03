@@ -4,7 +4,7 @@
 
 The MonteCarloGlauber.jl package is a tool to simulate initial conditions for heavy-ion collisions based on the Glauber model.
 
-##Installation 
+## Installation 
 
 To install the package and its dependencies one can use 
 ```julia
@@ -68,23 +68,9 @@ histogram(n_coll, bins = 10)
 
 ```
 
-With the events sampled we can now compute things such as the impact parameter histogram
-```julia
-b_event=map(event) do x
-    impactParameter(x) 
-end 
-histogram(b_event,nbins=100)
-```
-or the histogram for the number of collisions
-```julia
-ncoll_event=map(event) do x
-    x.n_coll
-end
-histogram(ncoll_event,nbins=100,yscale=:log10)
-```
 We can also plot the events by evaluating them on a grid
 ```julia
-profile=map(event)   do x 
+profile=map(evt)   do x 
     map(Iterators.product(-10:0.5:10,-10:0.5:10)) do y
         x(y...)
     end
