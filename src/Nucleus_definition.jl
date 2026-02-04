@@ -47,7 +47,7 @@ end
 
 Return a tabulated light-ion configuration for oxygen from the built-in artifact.
 """
-function Oxigen()
+function Oxygen()
     return TabulatedEvent(joinpath(root_light_ion, "NLEFT_dmin_0.5fm_negativeweights_O.h5"))
 end
 
