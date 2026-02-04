@@ -43,7 +43,7 @@ function Xenon()
 end
 
 """
-    Oxigen()
+    Oxygen()
 
 Return a tabulated light-ion configuration for oxygen from the built-in artifact.
 """

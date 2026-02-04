@@ -15,7 +15,7 @@ Lead
 Gold
 Copper
 Xenon
-Oxigen
+Oxygen
 Neon
 ```
 

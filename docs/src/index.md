@@ -6,7 +6,7 @@ MonteCarloGlauber.jl generates initial conditions for heavy-ion collisions using
 - Deformed 3D Woods-Saxon nuclei (`NucleiWoodSaxon3D`).
 - Integrated Woods-Saxon sampling with interpolation (`IntegratedWoodSaxon`, `IntegratedWoodSaxonInterp`).
 - Event-by-event participants and multiplicities (`Participants`, `Participant`).
-- Light-ion configurations via artifacts (`Oxigen`, `Neon`).
+- Light-ion configurations via artifacts (`Oxygen`, `Neon`).
 - Background and two-point correlator helpers (`generate_bg_two_pt_fct`, `generate_bg_twpt_fct`).
 
 ## Quickstart
