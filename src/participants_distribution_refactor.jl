@@ -69,6 +69,13 @@ end
 end
 
 
+"""
+    pmean(a, b, p)
+
+Combine two non‑negative thickness values `a` and `b` using a generalized power mean:
+- If `p == 0` this returns the geometric mean `sqrt(a*b)`.
+- Otherwise it returns ((a^p + b^p)/2)^(1/p) (the symmetric power mean used for the participant thickness combination).
+"""
 @inline function pmean(a, b, p)
     if p == 0
         return sqrt(a * b)
@@ -88,6 +95,16 @@ end
 
 end
 
+"""
+    fluctuating_thickness(x, y, f::Participant)
+
+Compute the fluctuating transverse thickness at coordinates `(x,y)` for a given `Participant` event.
+
+The thickness contributions from each participating nucleon are modelled as normalized Gaussians with width `f.sub_nucleon_width` and per‑participant weights (`f.shape1` and `f.shape2`). After summing the contributions from each nucleus the two thicknesses `ta` and `tb` are combined using `pmean(ta,tb,f.p)`.
+
+Returns
+- A scalar giving the local combined thickness value at `(x,y)`.
+"""
 function fluctuating_thickness(x::Num1, y::Num2, f::Participant{T, S, V, M, C, D, F}) where {Num1 <: Real, Num2 <: Real, T, S, V, M, C, D, F}
 
     part1 = f.part1
@@ -115,6 +132,13 @@ function fluctuating_thickness(x::Num1, y::Num2, f::Participant{T, S, V, M, C, D
     return pmean(ta, tb, p) #norm((ta,tb),p)
 end
 
+"""
+    fluctuating_thickness(x, y, participants::Vector{Participant})
+
+Compute the fluctuating thickness at `(x,y)` for a vector of `Participant` events, returning an array of thickness values (one per event).
+
+This is a convenience vectorized wrapper around the single‑event `fluctuating_thickness`.
+"""
 function fluctuating_thickness(x::Num1, y::Num2, f::Vector{Participant{T, S, V, M, C, D, F}}) where {Num1 <: Real, Num2 <: Real, T, S, V, M, C, D, F}
     return map(f) do f_i
         fluctuating_thickness(x, y, f_i)
@@ -122,6 +146,26 @@ function fluctuating_thickness(x::Num1, y::Num2, f::Vector{Participant{T, S, V, 
 end
 
 
+"""
+    Participants{A,B,C,D,E,F,G,H,L}
+
+Container describing a two‑nucleus collision setup and providing a `Sampleable` that generates
+`Participant` events.
+
+Fields
+- `nucl1`, `nucl2` — nucleus samplers for the two colliding nuclei.
+- `sub_nucleon_width` — Gaussian width (σ) used for the transverse matter distribution of sub‑nucleonic degrees of freedom.
+- `inpact_parameter_magitude` — distribution for the impact parameter magnitude (radial distribution).
+- `inpact_parameter_angle` — distribution for the impact parameter angle (azimuthal orientation).
+- `sigma_gg` — per‑gluon (partonic) cross section used in computing binary collision probabilities.
+- `shape_parameter` — Gamma distribution shape parameter used to sample per‑participant fluctuation weights.
+- `total_cross_section` — inelastic nucleon‑nucleon cross section at the chosen energy (σ_NN).
+- `p` — exponent used when combining thickness functions (p‑mean: `p = 0` implies geometric mean).
+- `accumulation_preparation` — precomputed data used to accelerate center‑of‑mass and accumulation calculations.
+
+Notes
+- Implements `Sampleable{Univariate, Participant}`, and `rand(rng, participants)` returns a sampled `Participant` event describing one collision configuration.
+"""
 struct Participants{A, B, C, D, E, F, G, H, L} <: Sampleable{Univariate, Participant}
     nucl1::A
     nucl2::B
@@ -155,7 +199,7 @@ function Participants(n1, n2, w, s_NN, k, p, b::Tuple{T1, T2}; Nr = 64, Nth = 32
 
     sigma_NN = cross_section_from_energy(s_NN)
     f(sigmagg, p) = totalcross_section(w, sigmagg, sigma_NN)
-    u0 = one(sigma_NN) #one(eltype(f))
+    u0 = one(sigma_NN) 
     prob = NonlinearProblem{false}(f, u0)
     sol = solve(prob, SimpleNewtonRaphson())
     sigg = sol.u
@@ -203,7 +247,6 @@ end
 
 @inline function totalcross_section(w, sigmaGG, sigmaNN) #double check
 
-    #(4*pi*w^2* (Base.MathConstants.γ - expinti(-(sigmagg/(4pi* w^2))) + log(sigmagg/(4pi* w^2))))
 
     C = 6 #truncation for integral
 
@@ -215,8 +258,6 @@ end
 @inline @fastmath function binary_impact_parameter_probability(b2, nucleos::Participants{A, B, C, D, E, F, G, H, L}) where {A, B, C, D, E, F, G, H, L}
     w = nucleos.sub_nucleon_width
     gasussd = 1 / (4 * w^2)
-    #Tnn=gasussd*exp(-b^2*gasussd)
-    #return 1-exp(-nucleos.sigma_gg*Tnn)
     Tnn = gasussd * Base.Math.exp_fast(-b2 * gasussd) / pi
     return one(Tnn) - Base.Math.exp_fast(-nucleos.sigma_gg * Tnn)
 
@@ -225,7 +266,32 @@ end
 
 #3d case
 
+"""
+    Distributions.rand(rng::AbstractRNG, nucleos::Participants)
 
+Sample a single collision `Participant` event from the configured `Participants` object.
+
+Arguments
+- `rng` — random number generator used for draws and acceptance tests.
+- `nucleos` — a `Participants` instance describing the two nuclei, sub‑nucleon width, cross sections, and other sampling parameters.
+
+Behavior
+- Draws nucleus configurations `n1`, `n2` and an impact-parameter orientation `θ_b`.
+- Samples an impact-parameter magnitude `b` from `nucleos.inpact_parameter_magitude` and shifts the two nuclei by ±b/2.
+- For each nucleon pair computes the binary collision probability using `binary_impact_parameter_probability` and accepts collisions via Bernoulli draws.
+- If at least one binary collision is discovered, builds a `Participant` containing participating nucleons, samples per-nucleon Gamma weights, recenters to the event center-of-mass (via `center_of_mass!`), and returns the populated `Participant`.
+
+Notes
+- The function uses rejection sampling to ensure the generated event contains at least one binary collision.
+
+Example
+```julia
+julia> nucleos = Participants(nucleus1, nucleus2, 0.4, 200.0, 1.0, 0.0)
+julia> evt = Distributions.rand(Random.default_rng(), nucleos)
+julia> evt.b  # impact-parameter magnitude
+0.7
+```
+"""
 function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2, C, D, E, F, G, H, L}) where {NUCL1, NUCL2, C, D, E, F, G, H, L}
 
 
@@ -245,25 +311,17 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
         @inbounds for nucl1 in axes(n1, 1)
             pos1 = SVector{2}(n1[nucl1, 1], n1[nucl1, 2])
             pos1rotshift = pos1 - b_vec
-            #x_1=pos1rotshift[1]
-            #y_1=pos1rotshift[2]
             @inbounds for nucl2 in axes(n2, 1)
                 pos2 = SVector{2}(n2[nucl2, 1], n2[nucl2, 2])
-                # @show pos2
                 pos2rotshift = pos2 + b_vec
-                #x_2=pos2rotshift[1]
-                #y_2=pos2rotshift[2]
+
 
                 v = pos1rotshift - pos2rotshift
-                impact_par = dot(v, v) #norm(pos1rotshift - pos2rotshift)
-                #impact_par=hypot(x_1-x_2,y_1-y_2)
+                impact_par = dot(v, v) 
                 probability = binary_impact_parameter_probability(impact_par, nucleos)
 
                 #accepted
                 if rand(rng, Bernoulli(probability))
-                    #@show probability, impact_par
-                    #push!(re1,SVector{2}(x_1,y_1))
-                    #push!(re2,SVector{2}(x_2,y_2))
                     push!(re1, pos1rotshift)
                     push!(re2, pos2rotshift)
                     ncoll += 1
@@ -295,6 +353,15 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
     return
 end
 
+"""
+    Distributions.rand(nucleos::Participants)
+
+Convenience wrapper that samples a `Participant` using the default RNG (`Random.default_rng()`).
+This is equivalent to `Distributions.rand(Random.default_rng(), nucleos)`.
+"""
+function Distributions.rand(nucleos::Participants{A, B, C, D, E, F, G, H, L}) where {A, B, C, D, E, F, G, H, L}
+    return Distributions.rand(Random.default_rng(), nucleos)
+end
 
 function Distributions.rand!(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2, C, D, E, F, H, L}, A::AbstractVector{T}) where {NUCL1, NUCL2, C, D, E, F, L, H, T}
 
