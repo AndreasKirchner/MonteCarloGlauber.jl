@@ -17,7 +17,7 @@ participants = Participants(n1, n2, w, s_NN, k, p, (1.0, 2.0))
 ## Nucleus Choices
 Use one of the built-in nucleus helpers:
 - `Lead()`, `Gold()`, `Uranium()`, `Copper()`, `Xenon()` for Woods-Saxon nuclei.
-- `Oxigen()` and `Neon()` for tabulated light-ion configurations.
+- `Oxygen()` and `Neon()` for tabulated light-ion configurations.
 
 ## Event Profiles
 `Participant` objects are callable: `evt(x, y)` returns the fluctuating thickness at coordinates `(x, y)`. This enables direct integration for eccentricities or sampling on grids for visualization.

@@ -4,8 +4,8 @@
 `centralities_selection_events` partitions events by multiplicity (most central first). The `bins` vector defines the upper edges of the centrality classes in percent.
 
 ```julia
-n1 = Oxigen()
-n2 = Oxigen()
+n1 = Oxygen()
+n2 = Oxygen()
 
 participants = Participants(n1, n2, 0.5, 2760, 1.0, 0.0)
 events = rand(threaded(participants), 200_000)
