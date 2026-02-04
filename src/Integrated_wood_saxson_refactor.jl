@@ -130,7 +130,6 @@ function Base.copy(s::IntegratedWoodSaxon{T, R, C, W, samp}) where {T, R, C, W, 
 end
 
 
-
 """
     Distributions._rand!(rng::AbstractRNG, s::IntegratedWoodSaxon, x::DenseMatrix{<:Real})
 

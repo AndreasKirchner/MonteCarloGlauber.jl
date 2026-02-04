@@ -199,7 +199,7 @@ function Participants(n1, n2, w, s_NN, k, p, b::Tuple{T1, T2}; Nr = 64, Nth = 32
 
     sigma_NN = cross_section_from_energy(s_NN)
     f(sigmagg, p) = totalcross_section(w, sigmagg, sigma_NN)
-    u0 = one(sigma_NN) 
+    u0 = one(sigma_NN)
     prob = NonlinearProblem{false}(f, u0)
     sol = solve(prob, SimpleNewtonRaphson())
     sigg = sol.u
@@ -317,7 +317,7 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
 
 
                 v = pos1rotshift - pos2rotshift
-                impact_par = dot(v, v) 
+                impact_par = dot(v, v)
                 probability = binary_impact_parameter_probability(impact_par, nucleos)
 
                 #accepted
