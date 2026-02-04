@@ -79,7 +79,7 @@ using Test
     end
 
     @testset "Light ion tabulated events" begin
-        oxygen = Oxigen()
+        oxygen = Oxygen()
         neon = Neon()
 
         @test oxygen isa TabulatedEvent
