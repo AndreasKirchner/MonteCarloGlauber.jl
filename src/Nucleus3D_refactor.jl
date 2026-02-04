@@ -1,24 +1,27 @@
 """
     NucleiWoodSaxon3D{T,R,C,W,D1,D2,D3,D4,B,samp}
 
-A 3‑dimensional deformed Woods–Saxon nucleus sampler that produces `N_nucleon` 3‑vectors per draw.
+Representation of a deformed 3D Woods–Saxon nucleus suitable for sampling.
 
 Fields
-- `N_nucleon::Int64` — number of nucleons returned per draw (each draw yields an `(N_nucleon, 3)` matrix of coordinates).
-- `α::T` — surface diffuseness parameter controlling the skin thickness.
-- `R::R` — nuclear radius parameter.
-- `ρ₀::C` — central density normalization.
-- `w::W` — quadratic radial modulation coefficient.
-- `beta2, beta3, beta4` — deformation parameters (spherical-harmonic multipoles) affecting the nuclear surface.
-- `gamma::D4` — orientation (triaxiality) angle used with `beta2` to mix Y20 and Y22 components.
-- `burning_time::B` — number of burn-in transitions executed when the internal sampler is constructed.
-- `sampler::samp` — internal `Metropolis_Hastings` sampler used to draw 3D candidate positions from the deformed projected density.
-- `d_min::Float64` — optional minimum inter-nucleon separation parameter (units of length); when zero no explicit separation policy is applied.
+- `N_nucleon::Int64` — number of nucleons per sample.
+- `α` — surface diffuseness parameter.
+- `R` — nuclear radius parameter.
+- `ρ₀` — central density normalization.
+- `w` — quadratic modulation coefficient.
+- `beta2, beta3, beta4` — deformation parameters (spherical-harmonic multipoles).
+- `gamma` — triaxiality angle used with `beta2`.
+- `burning_time` — number of burn-in transitions for the internal MCMC sampler.
+- `sampler` — internal `Metropolis_Hastings` sampler that proposes 3D locations according to the deformed density.
+- `d_min` — minimum inter-nucleon separation (when zero no separation enforcement is performed).
+
+Behavior
+- Samples are drawn in 3D using the internal sampler and then a random 3×3 rotation is applied; the object returns transverse (x,y) coordinates (an `(N_nucleon, 2)` array) by projecting the rotated 3D positions.
 
 Notes
-- This sampler produces 3D Cartesian coordinates (x,y,z). Sampling rotates each configuration by a random `RotMatrix{3}` before returning.
+- The type implements `Sampleable{ArrayLikeVariate{2}, Continuous}` and is intended for use with `rand`/`Distributions`.
 """
-struct NucleiWoodSaxon3D{T, R, C, W, D1, D2, D3, D4, B, samp} <: Sampleable{ArrayLikeVariate{3}, Continuous}
+struct NucleiWoodSaxon3D{T, R, C, W, D1, D2, D3, D4, B, samp} <: Sampleable{ArrayLikeVariate{2}, Continuous}
     N_nucleon::Int64
     α::T
     R::R
@@ -33,8 +36,28 @@ struct NucleiWoodSaxon3D{T, R, C, W, D1, D2, D3, D4, B, samp} <: Sampleable{Arra
     d_min::Float64
 end
 
-#function density_WS_deformed(x, y, z, α, R, ρ₀, w, beta2, beta3, beta4, gamma)
+"""
+    density_WS_deformed(x, y, z, α, R, ρ₀, w, beta2, beta3, beta4, gamma)
 
+Evaluate the deformed 3D Woods–Saxon density at Cartesian coordinates `(x,y,z)`.
+
+The local effective radius is modified by spherical harmonics up to l=4:
+
+Reff(θ,φ) = R * (1 + β₂*(cosγ·Y₂₀ + √2 sinγ·Y₂₂) + β₃·Y₃₀ + β₄·Y₄₀).
+
+Arguments
+- `x,y,z` — Cartesian coordinates where the density is evaluated.
+- `α` — surface diffuseness parameter (skin depth).
+- `R` — base nuclear radius.
+- `ρ₀` — central density normalization.
+- `w` — quadratic radial modulation coefficient.
+- `beta2, beta3, beta4` — deformation coefficients (multipoles).
+- `gamma` — triaxiality angle used to mix Y20/Y22 components for β₂.
+
+Returns
+- Scalar density value ρ(x,y,z) = ρ₀ (1 + w (r/Reff)^2) / (1 + exp((r - Reff)/α)).
+"""
+function density_WS_deformed(x, y, z, α, R, ρ₀, w, beta2, beta3, beta4, gamma)
     #spherical coordinates
     r = hypot(x, y, z)
     theta = acos(z / r)
@@ -54,10 +77,10 @@ end
 end
 
 
-dimension(::NucleiWoodSaxon3D{T, R, C, W, D1, D2, D3, D4, B, samp}) where {T, R, C, W, D1, D2, D3, D4, B, samp} = 3
+dimension(::NucleiWoodSaxon3D{T, R, C, W, D1, D2, D3, D4, B, samp}) where {T, R, C, W, D1, D2, D3, D4, B, samp} = 2
 nucleon(s::NucleiWoodSaxon3D{T, R, C, W, D1, D2, D3, D4, B, samp}) where {T, R, C, W, D1, D2, D3, D4, B, samp} = s.N_nucleon
 
-Base.size(s::NucleiWoodSaxon3D{T, R, C, W, D1, D2, D3, D4, B, samp}) where {T, R, C, W, D1, D2, D3, D4, B, samp} = (s.N_nucleon, 3)
+Base.size(s::NucleiWoodSaxon3D{T, R, C, W, D1, D2, D3, D4, B, samp}) where {T, R, C, W, D1, D2, D3, D4, B, samp} = (s.N_nucleon, 2)
 function Base.eltype(s::NucleiWoodSaxon3D{T, R, C, W, D1, D2, D3, D4, B, samp}) where {T, R, C, W, D1, D2, D3, D4, B, samp}
     return promote_type(T, R, C, W, D1, D2, D3, D4)
 end
@@ -66,21 +89,21 @@ end
 """
     NucleiWoodSaxon3D(rng::AbstractRNG, N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma, burning_time, dmin)
 
-Construct a `NucleiWoodSaxon3D` sampler.
+Construct a `NucleiWoodSaxon3D` with explicit RNG, burn-in and minimum-separation parameters.
 
 Arguments
-- `rng` — random number generator used to seed the internal MCMC sampler.
-- `N_nucleon` — number of nucleons per sample.
-- `α, R, ρ₀, w` — Woods–Saxon parameters.
-- `beta2, beta3, beta4, gamma` — deformation parameters and triaxiality angle.
-- `burning_time` — number of burn-in transitions for the internal `Metropolis_Hastings` sampler.
-- `dmin` — minimum inter-nucleon separation (units of length); may be zero to disable.
+- `rng` — RNG used to seed proposals and acceptance tests in the internal MCMC sampler.
+- `N_nucleon` — number of nucleons to sample per draw.
+- `α, R, ρ₀, w, beta2, beta3, beta4, gamma` — Woods–Saxon and deformation parameters (see `density_WS_deformed`).
+- `burning_time` — number of burn-in iterations for the internal `Metropolis_Hastings` sampler.
+- `dmin` — minimum inter-nucleon separation (stored on the object; not applied here by the constructor).
 
 Behavior
-- Builds a 3‑component Normal proposal (σ = R for each Cartesian component) and a `Metropolis_Hastings` sampler targeted on `density_WS_deformed`.
+- Constructs a 3-component Normal proposal (σ=R) and a `Metropolis_Hastings` sampler targeting `density_WS_deformed`, performs the requested burn-in, and returns a fully configured `NucleiWoodSaxon3D` instance ready for sampling via `rand`.
 """
 function NucleiWoodSaxon3D(rng::AbstractRNG, N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma, burning_time, dmin)
 
+    #draw=(Uniform(-2R,2R),Uniform(-2R,2R),Uniform(-2R,2R))
     draw = (Normal(0, R), Normal(0, R), Normal(0, R))
 
     params = (α, R, ρ₀, w, beta2, beta3, beta4, gamma)
@@ -98,20 +121,9 @@ function NucleiWoodSaxon3D(N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamm
 end
 
 """
-    NucleiWoodSaxon3D(N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma)
+    NucleiWoodSaxon3D(N_nucleon,α,R,ρ₀,w,beta2,beta3,beta4,gamma)
 
-Convenience constructor using sensible defaults:
-- `rng = Random.default_rng()`
-- `burning_time = 1000`
-- `dmin = 0.0` (no minimum separation)
-
-Returns a ready-to-use `NucleiWoodSaxon3D` instance that produces `(N_nucleon, 3)` arrays of Cartesian coordinates when sampled with `rand`.
-
-Example
-```julia
-julia> s = NucleiWoodSaxon3D(100, 0.5, 5.4, 0.16, 0.0, 0.0, 0.0, 0.0)
-julia> sample = rand(s)  # single configuration; shape (100, 3)
-```
+Create a 3D distribution of nucleons in a nucleus with a Wood-Saxon density profile. The density profile is deformed by the parameters `beta2`, `beta3`, `beta4`, and `gamma`. The number of nucleons is `N_nucleon`, the radius is `R`, the diffuseness is `α`, the central density is `ρ₀`, and the skin depth is `w`.
 """
 function NucleiWoodSaxon3D(N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma)
     rng = Random.default_rng()
@@ -129,15 +141,23 @@ end
 """
     Distributions._rand!(rng::AbstractRNG, s::NucleiWoodSaxon3D, x::DenseMatrix{<:Real})
 
-Fill `x` in-place with a single sampled nuclear configuration. The expected shape of `x` is `(s.N_nucleon, 3)`.
+Fill `x` in-place with a single sampled nuclear configuration from `s`.
+
+Arguments
+- `rng` — random number generator used for proposals and acceptance tests.
+- `s` — the `NucleiWoodSaxon3D` sampler.
+- `x` — preallocated matrix to be filled; expected shape `(s.N_nucleon, 2)` representing transverse `(x,y)` coordinates.
 
 Behavior
-- For each nucleon (row) `i` the function draws a 3‑vector `xpos = rand(rng, s.sampler)` from the internal `Metropolis_Hastings` sampler.
-- A single random `RotMatrix{3}` is sampled and applied to every drawn configuration so nuclei are returned with random orientation.
-- If `s.d_min` is greater than zero a minimum-inter-nucleon-separation policy may be applied (implementation-dependent); when zero no separation policy is enforced.
+- For each nucleon the function draws a 3‑vector from the internal `Metropolis_Hastings` sampler via `rand(rng, s.sampler)`.
+- A single random `RotMatrix{3}` is sampled and applied to all nucleon positions; the rotated 3‑vector is projected to `(x,y)` and written into `x`.
+- If `s.d_min > 0` a minimum-inter-nucleon-separation policy may be applied (implementation detail); when zero no separation policy is enforced.
+
+Returns
+- The mutated input matrix `x`.
 
 Notes
-- This is the low-level, in-place sampling hook used by `Distributions.rand` and the package's high-level APIs.
+- This is a low‑level, allocation‑efficient sampling hook used by the package's `rand` APIs.
 """
 function Distributions._rand!(rng::AbstractRNG, s::NucleiWoodSaxon3D{T, R, C, W, D1, D2, D3, D4, B, samp}, x::DenseMatrix{<:Real}) where {T, R, C, W, D1, D2, D3, D4, B, samp}
 
