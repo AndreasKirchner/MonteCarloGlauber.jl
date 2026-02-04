@@ -234,7 +234,6 @@ batches = centralities_selection_events(events, bins)
 ```
 
 """
-
 function centralities_selection_events(events::Vector{T}, bins) where {T <: Participant}
 
     mult = multiplicity.(events)
@@ -388,6 +387,36 @@ function (func::InverseFunction{1, F})(x; u0 = 0.1 * one(x)) where {F}
     return solve(prob, SimpleNewtonRaphson()).u
 end
 
+"""
+    generate_bg_two_pt_fct(f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; 
+                           minBiasEvents=1000000, r_grid=0:1:10, step=2pi/20, Threaded=true,
+                           n_ext_Grid=0, nFields=10)
+
+Generate a background profile and two-point correlation function for a given
+collision system.
+
+# Arguments
+- `f`: Function to convert background values (e.g., entropy to temperature).
+- `delta_factor`: Function to convert correlators to the desired observable.
+- `norm`: Normalization factor for event profiles.
+- `Projectile1`, `Projectile2`: Projectile nuclei.
+- `w`, `k`, `p`: Sub-nucleon width, fluctuation parameter, and reduced thickness.
+- `sqrtS`: Center-of-mass energy in GeV.
+- `bins`: Centrality bin upper edges (implicit lower edge is 0).
+- `mList`: Harmonic modes to evaluate.
+
+# Keyword Arguments
+- `minBiasEvents`: Number of minimum-bias events to generate.
+- `r_grid`: Radial grid for background/correlators.
+- `step`: Angular step size for the background calculation.
+- `Threaded`: Whether to use multithreaded event generation.
+- `n_ext_Grid`: Optional padding for correlator grids.
+- `nFields`: Number of fields in the correlator tensor.
+
+# Returns
+- `bg`: Background values for each centrality bin.
+- `finalCorr`: Correlator tensor with shape `(length(bg), 2, nFields, nFields, length(mList), nGrid, nGrid)`.
+"""
 #TODO check which of these functions is the best and port it to the new version of the code
 function generate_bg_two_pt_fct(f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; minBiasEvents = 1000000, r_grid = 0:1:10, step = 2pi / 20, Threaded = true, n_ext_Grid = 0, nFields = 10)
     #batches, CoM=batched_events(Projectile1,Projectile2,w,k,p,sqrtS,bins;minBiasEvents=minBiasEvents)

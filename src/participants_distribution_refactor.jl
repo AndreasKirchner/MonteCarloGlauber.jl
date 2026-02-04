@@ -1,3 +1,13 @@
+"""
+    Participant
+
+Container for a single sampled collision event.
+
+`Participant` stores participant positions for both nuclei, per-participant weights,
+binary-collision count, sampling parameters, and derived quantities such as the
+impact parameter and total multiplicity. The object is callable: `evt(x, y)`
+returns the fluctuating thickness at `(x, y)`.
+"""
 struct Participant{T, S, V, M, C, D, F} <: ValueSupport
     part1::Vector{SVector{2}{T}}
     part2::Vector{SVector{2}{S}}
@@ -14,9 +24,32 @@ struct Participant{T, S, V, M, C, D, F} <: ValueSupport
 end
 
 
+"""
+    impactParameter(evt::Participant)
+
+Return the impact parameter `b` for a sampled event.
+"""
 impactParameter(x::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = x.b
+
+"""
+    multiplicity(evt::Participant)
+
+Return the total multiplicity (entropy-like weight) for a sampled event.
+"""
 multiplicity(x::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = x.multiplicity
+
+"""
+    n_coll(evt::Participant)
+
+Return the number of binary nucleon-nucleon collisions in the event.
+"""
 n_coll(x::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = x.n_coll
+
+"""
+    n_part(evt::Participant)
+
+Return the number of participating nucleons in the event.
+"""
 n_part(x::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F} = length(x.part1) + length(x.part2)
 
 

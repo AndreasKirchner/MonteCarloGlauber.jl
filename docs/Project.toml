@@ -1,0 +1,6 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+MonteCarloGlauber = "975a0a4c-3350-41ca-9a50-68f91c961bd0"
+
+[compat]
+Documenter = "1"

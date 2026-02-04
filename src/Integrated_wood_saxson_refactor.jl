@@ -92,6 +92,12 @@ function Distributions._rand!(rng::AbstractRNG, s::IntegratedWoodSaxon{T, R, C, 
 end
 
 
+"""
+    Threaded(elem[, nbuffers])
+
+Wrapper that stores thread-local copies of a sampleable object to enable
+multithreaded sampling with `rand`.
+"""
 struct Threaded{T, N} <: Sampleable{ArrayLikeVariate{N}, Continuous}
     copy_buff::T
     dim::Int64

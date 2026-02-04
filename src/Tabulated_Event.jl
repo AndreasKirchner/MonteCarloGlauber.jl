@@ -1,3 +1,13 @@
+"""
+    TabulatedEvent(path)
+
+Load a tabulated light-ion configuration from an HDF5 file and return a
+sampleable distribution over nucleon positions.
+
+The file is expected to contain a `configs` dataset with shape
+`(3, N_nucleon, N_configs)`; sampling draws a random configuration and applies
+a random 3D rotation.
+"""
 struct TabulatedEvent{B} <: Sampleable{ArrayLikeVariate{2}, Continuous}
     N_nucleon::Int64
     N_configs::Int64
