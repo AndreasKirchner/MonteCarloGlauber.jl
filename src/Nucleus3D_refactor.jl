@@ -33,7 +33,7 @@ struct NucleiWoodSaxon3D{T, R, C, W, D1, D2, D3, D4, B, samp} <: Sampleable{Arra
     d_min::Float64
 end
 
-function density_WS_deformed(x, y, z, α, R, ρ₀, w, beta2, beta3, beta4, gamma)
+#function density_WS_deformed(x, y, z, α, R, ρ₀, w, beta2, beta3, beta4, gamma)
 
     #spherical coordinates
     r = hypot(x, y, z)
