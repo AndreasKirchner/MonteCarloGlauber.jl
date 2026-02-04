@@ -93,6 +93,9 @@ profile = map(evt) do x
 end
 heatmap(-10:0.5:10, -10:0.5:10, profile[1])
 ```
+<p align="center">
+  <img src="docs/src/assets/example_plot.png" width="600">
+</p>
 
 ## Light-Ion Configurations
 This package ships light-ion configurations as an artifact, so you can use the built-in helpers:
