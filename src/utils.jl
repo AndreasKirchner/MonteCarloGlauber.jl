@@ -205,7 +205,6 @@ Convenience wrapper that prepares a quadrature cache and calls `epsilon_n_psi_n!
 end
 
 
-#TODO check if function is needed
 function split_vector_by_indices(vector, indices)
     starts = vcat(1, indices .+ 1)
     ends = vcat(indices, length(vector))
@@ -388,235 +387,6 @@ function (func::InverseFunction{1, F})(x; u0 = 0.1 * one(x)) where {F}
 end
 
 """
-    generate_bg_two_pt_fct(f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; 
-                           minBiasEvents=1000000, r_grid=0:1:10, step=2pi/20, Threaded=true,
-                           n_ext_Grid=0, nFields=10)
-
-Generate a background profile and two-point correlation function for a given
-collision system.
-
-# Arguments
-- `f`: Function to convert background values (e.g., entropy to temperature).
-- `delta_factor`: Function to convert correlators to the desired observable.
-- `norm`: Normalization factor for event profiles.
-- `Projectile1`, `Projectile2`: Projectile nuclei.
-- `w`, `k`, `p`: Sub-nucleon width, fluctuation parameter, and reduced thickness.
-- `sqrtS`: Center-of-mass energy in GeV.
-- `bins`: Centrality bin upper edges (implicit lower edge is 0).
-- `mList`: Harmonic modes to evaluate.
-
-# Keyword Arguments
-- `minBiasEvents`: Number of minimum-bias events to generate.
-- `r_grid`: Radial grid for background/correlators.
-- `step`: Angular step size for the background calculation.
-- `Threaded`: Whether to use multithreaded event generation.
-- `n_ext_Grid`: Optional padding for correlator grids.
-- `nFields`: Number of fields in the correlator tensor.
-
-# Returns
-- `bg`: Background values for each centrality bin.
-- `finalCorr`: Correlator tensor with shape `(length(bg), 2, nFields, nFields, length(mList), nGrid, nGrid)`.
-"""
-#TODO check which of these functions is the best and port it to the new version of the code
-function generate_bg_two_pt_fct(f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; minBiasEvents = 1000000, r_grid = 0:1:10, step = 2pi / 20, Threaded = true, n_ext_Grid = 0, nFields = 10)
-    #batches, CoM=batched_events(Projectile1,Projectile2,w,k,p,sqrtS,bins;minBiasEvents=minBiasEvents)
-    if (length(bins) + 1) * 100 > minBiasEvents
-        error("Not enough events for number of bins, increase minBiasEvents")
-    end
-    participants = Participants(Projectile1, Projectile2, w, sqrtS, k, p)
-    #if threaded
-    events = rand(threaded(participants), minBiasEvents)
-    #else
-    #    events=rand(participants,minBiasEvents)
-    #end
-    batches, CoM = centralities_selection_CoM(events, bins; Threaded = Threaded)
-    bg = generate_background(f, norm, batches, CoM, r_grid = r_grid, step = step)
-    twoPtFct_entropy = generate_2ptfct_all(norm, batches, CoM, mList; r_grid = r_grid, step = step)
-    #@show  size(twoPtFct_entropy[1][1][1]),size(twoPtFct_entropy[1]),size(twoPtFct_entropy[1]),size(twoPtFct_entropy)
-    twoPtFct = map(m -> map(cc -> map(r1 -> map(r2 -> twoPtFct_entropy[m][cc][r1, r2] * delta_factor(bg[cc][r1]) * delta_factor(bg[cc][r2]), 1:length(r_grid)), 1:length(r_grid)), 1:length(bg)), 1:length(mList))
-    #twoPtFct=map(m->map(cc->map(r1->map(r2->twoPtFct_entropy[m][cc][r1][r2],1:length(r_grid)),1:length(r_grid)),1:length(bg)),1:length(mList))
-    nGrid = max(length(r_grid), n_ext_Grid)
-    finalCorr = zeros(length(bg), 2, nFields, nFields, length(mList), nGrid, nGrid)
-    for cc in 1:length(bg)
-        for m in 1:length(mList)
-            for r1 in 1:length(r_grid)
-                for r2 in 1:length(r_grid)
-                    finalCorr[cc, 1, 1, 1, m, r1, r2] = real(twoPtFct[m][cc][r1][r2])
-                end
-            end
-        end
-    end
-    return bg, finalCorr
-end
-
-
-function generate_bg_two_pt_fct_save(
-        f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; minBiasEvents = 1000, r_grid = 0:1:10, step = 2pi / 20, Threaded = true, n_ext_Grid = 0, nFields = 10,
-        extensionString = "dat", path = "./", override_files = false, selected_bins = nothing
-    )
-
-    if (length(bins) + 1) * 100 > minBiasEvents
-        error("Not enough events for number of bins, increase minBiasEvents")
-    end
-    participants = Participants(Projectile1, Projectile2, w, sqrtS, k, p)
-    nGrid = max(length(r_grid), n_ext_Grid)
-    finalCorr = zeros(length(bins), 2, nFields, nFields, length(mList), nGrid, nGrid)
-    bg = zeros(length(bins), nGrid)
-
-    evt_gen_counter = 0
-
-    # Determine which bins to process
-    bin_indices = eachindex(bins)
-    if selected_bins !== nothing
-        # selected_bins can be a single value or a vector of bin ranges, e.g. [2] or [2,3]
-        bin_indices = selected_bins
-    end
-
-    for cc in bin_indices
-        if cc == 1
-            lb = 0
-            rb = bins[cc]
-        else
-            lb = bins[cc - 1]
-            rb = bins[cc]
-        end
-        bg_file = check_for_config(participants; extensionString = extensionString, path = path, cc = string(lb) * "-" * string(rb))[1]
-        bgString = construct_trento_names(participants; extensionString = extensionString, cc = string(lb) * "-" * string(rb), path = path)[1]
-        if bg_file == true && override_files == false
-            bg[cc, :] = collect(readdlm(bgString))
-        elseif (bg_file == false || override_files == true) && evt_gen_counter == 0
-            evt_gen_counter += 1
-            events = rand(threaded(participants), minBiasEvents)
-            batches, CoM = centralities_selection_CoM(events, bins; Threaded = Threaded)
-        end
-        for i in eachindex(mList)
-            bg_file, twpt_file = check_for_config(participants; extensionString = extensionString, mMode = mList[i], path = path, cc = string(lb) * "-" * string(rb))
-            bgString, twoptString = construct_trento_names(participants; extensionString = extensionString, mMode = mList[i], cc = string(lb) * "-" * string(rb), path = path)
-            if twpt_file == true && override_files == false
-                finalCorr[cc, 1, 1, 1, i, :, :] = collect(readdlm(twoptString))
-            elseif (twpt_file == false || override_files == true) && evt_gen_counter == 0
-                evt_gen_counter += 1
-                events = rand(threaded(participants), minBiasEvents)
-                batches, CoM = centralities_selection_CoM(events, bins; Threaded = Threaded)
-            end
-        end
-
-
-        if bg_file == false || override_files == true
-            bg_small_grid = generate_background(f, norm, batches, CoM, cc, r_grid = r_grid, step = step)
-            for r1 in 1:length(r_grid)
-                bg[cc, r1] = bg_small_grid[r1]
-            end
-            writedlm(bgString, bg)
-        end
-
-        for i in eachindex(mList)
-            bg_file, twpt_file = check_for_config(participants; extensionString = extensionString, mMode = mList[i], path = path, cc = string(lb) * "-" * string(rb))
-            bgString, twoptString = construct_trento_names(participants; extensionString = extensionString, mMode = mList[i], cc = string(lb) * "-" * string(rb), path = path)
-            if twpt_file == false || override_files == true
-                twoPtFct_entropy = generate_2ptfct(norm, batches, CoM, mList[i], cc; r_grid = r_grid, step = step)
-                twoPtFct = map(r1 -> map(r2 -> twoPtFct_entropy[r1, r2] * delta_factor(bg[r1]) * delta_factor(bg[r2]), 1:length(r_grid)), 1:length(r_grid))
-                for r1 in 1:length(r_grid)
-                    for r2 in 1:length(r_grid)
-                        finalCorr[cc, 1, 1, 1, i, r1, r2] = real(twoPtFct[r1][r2])
-                    end
-                end
-                writedlm(twoptString, finalCorr[cc, 1, 1, 1, i, :, :])
-            end
-        end
-    end
-    return bg, finalCorr
-end
-
-function generate_bg_two_pt_fct_save_faster(
-        f, delta_factor, norm::Float64, Projectile1::NucleiWoodSaxon3D, Projectile2::NucleiWoodSaxon3D, w::Float64, k::Float64, p::Float64, sqrtS::Float64, bins::Vector{Int64}, mList::Vector{Int64}; minBiasEvents::Int = 1000, r_grid = 0:1.0:10, step::Float64 = 2pi / 20, Threaded::Bool = true, n_ext_Grid::Int = 0, nFields::Int = 10,
-        extensionString::String = "dat", path::String = "./", override_files::Bool = false
-    )
-
-    # Basic validation
-    if (length(bins) + 1) * 100 > minBiasEvents
-        error("Not enough events for number of bins, increase minBiasEvents")
-    end
-
-    # Initialize participant system and arrays
-    participants = Participants(Projectile1, Projectile2, w, sqrtS, k, p)
-    nGrid = max(length(r_grid), n_ext_Grid)
-    finalCorr = zeros(eltype(r_grid), length(bins), 2, nFields, nFields, length(mList), nGrid, nGrid)
-    bg = zeros(eltype(r_grid), length(bins), nGrid)
-
-    # Loop over all bins
-    for cc in eachindex(bins)
-        # Define lower and upper bin edges
-        lb = cc == 1 ? 0 : bins[cc - 1]
-        rb = bins[cc]
-
-        # Background file path
-        bgString = construct_trento_names(
-            participants;
-            extensionString = extensionString,
-            cc = string(lb) * "-" * string(rb),
-            path = path
-        )[1]
-
-        if override_files
-            # =====================================
-            # REGENERATE AND OVERWRITE ALL FILES
-            # =====================================
-            events = rand(threaded(participants), minBiasEvents)
-            batches, CoM = centralities_selection_CoM(events, bins; Threaded = Threaded)
-
-            # Generate background
-            bg_small_grid = generate_background(f, norm, batches, CoM, cc, r_grid = r_grid, step = step)
-            for r1 in 1:length(r_grid)
-                bg[cc, r1] = bg_small_grid[r1]
-            end
-            writedlm(bgString, bg[cc, :])
-
-            # Generate two-point correlation functions
-            @inbounds  for i in eachindex(mList)
-                _, twoptString = construct_trento_names(
-                    participants;
-                    extensionString = extensionString,
-                    mMode = mList[i],
-                    cc = string(lb) * "-" * string(rb),
-                    path = path
-                )
-
-                twoPtFct_entropy = generate_2ptfct(norm, batches, CoM, mList[i], cc; r_grid = r_grid, step = step)
-                twoPtFct = map(r1 -> map(r2 -> twoPtFct_entropy[r1, r2] * delta_factor(bg_small_grid[r1]) * delta_factor(bg_small_grid[r2]), 1:length(r_grid)), 1:length(r_grid))
-                @inbounds for r1 in 1:length(r_grid)
-                    @inbounds for r2 in 1:length(r_grid)
-                        finalCorr[cc, 1, 1, 1, i, r1, r2] = real(twoPtFct[r1][r2])
-                    end
-                end
-                writedlm(twoptString, finalCorr[cc, 1, 1, 1, i, :, :])
-
-            end
-
-        else
-            # =====================================
-            # READ EXISTING FILES ONLY
-            # =====================================
-            bg[cc, :] = collect(readdlm(bgString, eltype(r_grid)))
-
-            for i in eachindex(mList)
-                _, twoptString = construct_trento_names(
-                    participants;
-                    extensionString = extensionString,
-                    mMode = mList[i],
-                    cc = string(lb) * "-" * string(rb),
-                    path = path
-                )
-                finalCorr[cc, 1, 1, 1, i, :, :] = collect(readdlm(twoptString, eltype(r_grid)))
-            end
-        end
-    end
-
-    return bg, finalCorr
-
-end
-
-"""
     change_norm(bg, finalCorr, new_norm, old_norm, entropy)
 
 Rescale background and two-point correlator quantities when changing the normalization.
@@ -635,13 +405,27 @@ Rescale background and two-point correlator quantities when changing the normali
 - The rescaling multiplies entropy by `new_norm/old_norm` and converts back using the inverse of `entropy`.
 - Correlators scale with the square of the rescaling factor.
 """
-function change_norm(bg, finalCorr, new_norm, old_norm, entropy)
+function change_norm(f, delta_factor, bg, tw_pt_entropy, new_norm, old_norm)
     rescaling_factor = new_norm / old_norm
-    entropyToTemp(T) = InverseFunction(entropy)(T) #inverse, i.e. T(s)
+    invf = InverseFunction(f)
+    inv_delta_factor = InverseFunction(delta_factor)
+    rescaled_bg = f.(invf.(bg) .* rescaling_factor)
 
-    rescaled_bg = entropyToTemp.(entropy.(bg) .* rescaling_factor)
-    rescaled_finalCorr = finalCorr .* (rescaling_factor^2)
-    return rescaled_bg, rescaled_finalCorr
+    ccLen = size(bg, 1)
+    rLen = size(tw_pt_entropy, 6)
+    mLen = size(tw_pt_entropy, 5)
+    @inbounds for cc in 1:ccLen
+        @inbounds for m in 1:mLen
+            @inbounds for r1 in 1:rLen
+                @inbounds for r2 in r1:rLen
+                    tw_pt_entropy[cc, 1, 1, 1, m, r1, r2] = tw_pt_entropy[cc, 1, 1, 1, m, r1, r2] * inv_delta_factor(bg[cc, r1]) * inv_delta_factor(bg[cc, r2]) *delta_factor(rescaled_bg[cc, r1]) * delta_factor(rescaled_bg[cc, r2]) * (rescaling_factor^2)
+                    tw_pt_entropy[cc, 1, 1, 1, m, r2, r1] = tw_pt_entropy[cc, 1, 1, 1, m, r1, r2]
+                end
+            end
+        end
+    end
+
+    return rescaled_bg, tw_pt_entropy
 end
 
 """
@@ -667,6 +451,15 @@ function mean_at(configuration, r_1, m, len)
             x_1 = r_1 * cos(θ_1)
             y_1 = r_1 * sin(θ_1)
             conf(x_1, y_1)exp(im * m * (θ_1))
+        end
+    end
+end
+function mean_at(configuration, r_1, len)
+    return mean(configuration) do conf
+        mean(range(0, 2pi, len)) do θ_1
+            x_1 = r_1 * cos(θ_1)
+            y_1 = r_1 * sin(θ_1)
+            conf(x_1, y_1)
         end
     end
 end
@@ -722,7 +515,7 @@ function second_cumulant(configuration, r_1, r_2, m, norm, len)
         result_av += sumaverege
         result_av_cc += sumaverage_cc
     end
-    return (result - result_av * result_av_cc / nevnet) / (nevnet * len * len)
+    return real(result - result_av * result_av_cc / nevnet) / (nevnet * len * len)
 end
 
 """
@@ -744,15 +537,25 @@ Generate a background radial profile from event batches.
 # Notes
 - The background at each radius is computed as the real part of the angular and event average of the profile at that radius.
 """
-function generate_bg(fun, batches, bins, r_grid, Norm; NumPhiPoints = 20)
+function generate_bg(fun, batches, bins, r_grid, Norm; NumPhiPoints = 20, threaded = true)
     bg = zeros(eltype(r_grid), length(bins), length(r_grid))
-    for cc_batches in 1:(length(batches) - 1)
-        for r_i in eachindex(r_grid)
+    if threaded
+        Threads.@threads for I in CartesianIndices(bg)
+            cc_batches = I[1]
+            r_i = I[2]
             r = r_grid[r_i]
-            bg[cc_batches, r_i] = real.(mean_at(batches[cc_batches], r, 0, NumPhiPoints))
+            bg[cc_batches, r_i] = mean_at(batches[cc_batches], r, NumPhiPoints)
+        end
+    else
+        for cc_batches in 1:(length(batches) - 1)
+            for r_i in eachindex(r_grid)
+                r = r_grid[r_i]
+                bg[cc_batches, r_i] = mean_at(batches[cc_batches], r, NumPhiPoints)
+            end
         end
     end
     return fun.(Norm .* bg)
+
 end
 """
     generate_tw_pt_fct_entropy(batches, bins, r_grid, m_list, Norm; NumPhiPoints=20, Nfields=10)
@@ -776,50 +579,67 @@ Compute entropy two-point correlators <δSδS>_c for a list of harmonics.
 """
 function generate_tw_pt_fct_entropy(batches, bins, r_grid, m_list, Norm; NumPhiPoints = 20, Nfields = 10)
     finalCorrelator = zeros(eltype(r_grid), length(bins), 2, Nfields, Nfields, length(m_list), length(r_grid), length(r_grid))
-    for cc in 1:(length(batches) - 1)
-        for m in 1:length(m_list)
-            for r1 in 1:length(r_grid)
-                for r2 in r1:length(r_grid)
+    #=   if threaded
+        fakeCorrelator = zeros(eltype(r_grid), length(bins), length(m_list), length(r_grid), length(r_grid))
+        Threads.@threads for I in CartesianIndices(fakeCorrelator)
+            cc = I[1]
+            m = I[2]
+            r1 = I[3]
+            r2 = I[4]
+            finalCorrelator[cc, 1, 1, 1, m, r1, r2] = real(second_cumulant(batches[cc], r_grid[r1], r_grid[r2], m_list[m], Norm, NumPhiPoints))
+            finalCorrelator[cc, 1, 1, 1, m, r2, r1] = finalCorrelator[cc, 1, 1, 1, m, r1, r2]
+        end
+    else=#
+    @inbounds for cc in 1:(length(batches) - 1)
+        @inbounds for m in eachindex(m_list)
+            @inbounds for r1 in eachindex(r_grid)
+                @inbounds for r2 in r1:length(r_grid)
                     finalCorrelator[cc, 1, 1, 1, m, r1, r2] = real(second_cumulant(batches[cc], r_grid[r1], r_grid[r2], m_list[m], Norm, NumPhiPoints))
                     finalCorrelator[cc, 1, 1, 1, m, r2, r1] = finalCorrelator[cc, 1, 1, 1, m, r1, r2]
-                end
+                #end
             end
         end
     end
+end
     return finalCorrelator
 end
 """
-    eos_convert_correlator(delta_factor, bg, correlator)
+        eos_convert_correlator!(tw_pt_entropy, delta_factor, bg)
 
-Apply an equation-of-state conversion to correlator entries using a pointwise `delta_factor` evaluated on the background.
+Multiply two-point correlator entries (in entropy space) by conversion factors
+derived from a background profile, in-place.
 
-# Arguments
-- `delta_factor`: Function mapping a background value to a multiplicative conversion factor (e.g., converting entropy to temperature response).
-- `bg`: Background array with shape `(n_cc, n_r)`.
-- `correlator`: Correlator array to be updated in-place; expected to have harmonic index at position 5 and radial indices at the last two positions.
+Arguments
+- `tw_pt_entropy::AbstractArray{<:Real}`: Correlator array with dimensions
+    `(n_cc, 2, Nfields, Nfields, mLen, rLen, rLen)`. This function operates on
+    entries indexed as `[cc, 1, 1, 1, m, r1, r2]`.
+- `delta_factor::Function`: Maps a scalar background value to a multiplicative
+    conversion factor (e.g., converting entropy to temperature response).
+- `bg::AbstractArray{<:Real}`: Background array of shape `(n_cc, rLen)`.
 
-# Returns
-- `correlator`: The updated correlator array after applying the conversion.
+Returns
+- `tw_pt_entropy` (modified in-place): The updated correlator array.
 
-# Notes
-- The function multiplies the two-point entries by `delta_factor(bg[r1]) * delta_factor(bg[r2])` and symmetrizes them.
-- The implementation currently reads from `tw_pt_entropy` in its body; ensure the correct source of entropy-space correlators is provided when invoking this function.
+Notes
+- The function multiplies the two-point entries by
+    `delta_factor(bg[cc, r1]) * delta_factor(bg[cc, r2])` and symmetrizes them so
+    that `[..., r2, r1] == [..., r1, r2]`.
 """
-function eos_convert_correlator(delta_factor, bg, correlator)
-    ccLen = size(bg)[1]
-    rLen = size(bg)[2]
-    mLen = size(correlator)[5]
-    for cc in 1:ccLen
-        for m in 1:mLen
-            for r1 in 1:rLen
-                for r2 in r1:rLen
-                    correlator[cc, 1, 1, 1, m, r1, r2] = tw_pt_entropy[cc, 1, 1, 1, m, r1, r2] * delta_factor(bg[cc, r1]) * delta_factor(bg[cc, r2])
-                    correlator[cc, 1, 1, 1, m, r2, r1] = correlator[cc, 1, 1, 1, m, r1, r2]
+function eos_convert_correlator!(tw_pt_entropy, delta_factor, bg) #TODO: is it fine that delta_factor is not first argument?
+    ccLen = size(bg, 1)
+    rLen = size(tw_pt_entropy, 6)
+    mLen = size(tw_pt_entropy, 5)
+    @inbounds for cc in 1:ccLen
+        @inbounds for m in 1:mLen
+            @inbounds for r1 in 1:rLen
+                @inbounds for r2 in r1:rLen
+                    tw_pt_entropy[cc, 1, 1, 1, m, r1, r2] = tw_pt_entropy[cc, 1, 1, 1, m, r1, r2] * delta_factor(bg[cc, r1]) * delta_factor(bg[cc, r2])
+                    tw_pt_entropy[cc, 1, 1, 1, m, r2, r1] = tw_pt_entropy[cc, 1, 1, 1, m, r1, r2]
                 end
             end
         end
     end
-    return correlator
+    return tw_pt_entropy
 end
 
 """
@@ -841,8 +661,12 @@ High-level routine that generates a background profile and converts two-point co
 # Notes
 - This wrapper samples events (threaded if requested), computes background (`generate_bg`) and entropy-space correlators (`generate_tw_pt_fct_entropy`) and then applies `delta_factor` pointwise to obtain `correlator`.
 """
-function generate_bg_twpt_fct(f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; minBiasEvents = 1000000, r_grid = 0:1:10, NumPhiPoints = 20, Threaded = true, Nfields = 10)
-    correlator = zeros(eltype(r_grid), length(bins), 2, Nfields, Nfields, length(mList), length(r_grid), length(r_grid))
+function generate_bg_twpt_fct(f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; minBiasEvents = 1000000, r_grid = 0:1.:10, NumPhiPoints = 20, Threaded = true, Nfields = 10)
+    # Basic validation
+    if (length(bins) + 1) * 100 > minBiasEvents
+        error("Not enough events for number of bins, increase minBiasEvents")
+    end
+    
     participants = Participants(Projectile1, Projectile2, w, sqrtS, k, p)
     if Threaded
         events = rand(threaded(participants), minBiasEvents)
@@ -850,19 +674,133 @@ function generate_bg_twpt_fct(f, delta_factor, norm, Projectile1, Projectile2, w
         events = rand(participants, minBiasEvents)
     end
     batches = centralities_selection_events(events, bins)
-    bg = generate_bg(batches, bins, r_grid, f, norm; NumPhiPoints = NumPhiPoints)
-    TwPtEntropy = generate_tw_pt_fct_entropy(batches, bins, r_grid, mList, norm; NumPhiPoints = NumPhiPoints, Nfields = Nfields)
+    bg = generate_bg(f, batches, bins, r_grid, norm; NumPhiPoints = NumPhiPoints)
     tw_pt_entropy = generate_tw_pt_fct_entropy(batches, bins, r_grid, mList, norm; NumPhiPoints = NumPhiPoints, Nfields = Nfields)
+    eos_convert_correlator!(tw_pt_entropy, delta_factor, bg)
 
-    for cc in 1:(length(batches) - 1) #TODO put this in own function
-        for m in 1:length(mList)
-            for r1 in 1:length(r_grid)
-                for r2 in r1:length(r_grid)
-                    correlator[cc, 1, 1, 1, m, r1, r2] = tw_pt_entropy[cc, 1, 1, 1, m, r1, r2] * delta_factor(bg[cc, r1]) * delta_factor(bg[cc, r2])
-                    correlator[cc, 1, 1, 1, m, r2, r1] = correlator[cc, 1, 1, 1, m, r1, r2]
-                end
+    return bg, tw_pt_entropy
+end
+
+"""
+        generate_bg_two_pt_fct_save(f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; kwargs...)
+
+Generate and (optionally) save background profiles and two-point correlators for
+each centrality bin.
+
+Arguments
+- `f::Function`: Function applied to raw background values to produce the
+    physical background (e.g., equation-of-state transform).
+- `delta_factor::Function`: Maps a scalar background value to a multiplicative
+    conversion factor for the two-point correlator (applied pointwise).
+- `norm`: Normalization factor passed to background generation routines.
+- `Projectile1`, `Projectile2`, `w`, `k`, `p`, `sqrtS`: Parameters used to
+    construct the `Participants` object.
+- `bins::AbstractVector`: Centrality bin edges used to partition events.
+- `mList::AbstractVector`: List of harmonic orders for which to compute
+    two-point correlators.
+
+Keyword arguments
+- `minBiasEvents`: Number of sampled events (default: 1_000_000).
+- `r_grid`: Radial sampling points (default: `0:1.:10`).
+- `NumPhiPoints`: Number of angular sample points for integrals (default: 20).
+- `Threaded`: Use threaded event sampling when true (default: true).
+- `Nfields`: Number of stored fields in correlator tensor (default: 10).
+- `extensionString::String`: File extension for saved outputs (default: "dat").
+- `path::String`: Directory to read/write files (default: "./").
+- `override_files::Bool`: If true, recompute and overwrite existing files
+    (default: false).
+
+Returns
+- `(bg, finalCorr)`: Tuple where `bg` is an array of shape
+    `(length(bins), length(r_grid))` with the background profile per centrality,
+    and `finalCorr` is the correlator tensor with shape
+    `(length(bins), 2, Nfields, Nfields, length(mList), length(r_grid), length(r_grid))`.
+
+Behavior
+- For each centrality bin the function will either read existing background and
+    correlator files (if present and `override_files==false`) or generate them by
+    calling the internal `generate_bg_twpt_fct` helper. When generated, outputs
+    are written using `construct_trento_names` to build filenames and
+    `writedlm`/`readdlm` for I/O.
+"""
+function generate_bg_two_pt_fct_save(
+       f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; 
+       minBiasEvents = 1000000, r_grid = 0:1.:10, NumPhiPoints = 20, Threaded = true, Nfields = 10,
+        extensionString::String = "dat", path::String = "./", override_files::Bool = false
+    )
+
+    # Initialize participant system and arrays
+    participants = Participants(Projectile1, Projectile2, w, sqrtS, k, p)
+    finalCorr = zeros(eltype(r_grid), length(bins), 2, Nfields, Nfields, length(mList), length(r_grid), length(r_grid))
+    bg = zeros(eltype(r_grid), length(bins), length(r_grid))
+
+    # Loop over all bins
+    for cc in eachindex(bins)
+        # Define lower and upper bin edges
+        lb = cc == 1 ? 0 : bins[cc - 1]
+        rb = bins[cc]
+
+        # Background file path
+        bgString = construct_trento_names(
+            participants;
+            extensionString = extensionString,
+            cc = string(lb) * "-" * string(rb),
+            path = path
+        )[1]
+
+        if override_files
+           
+           bg, finalCorr = generate_bg_twpt_fct(f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; minBiasEvents = minBiasEvents, r_grid = r_grid, NumPhiPoints = NumPhiPoints, Threaded = Threaded, Nfields = Nfields)
+            writedlm(bgString, bg[cc, :])
+            # Generate two-point correlation functions
+            @inbounds  for i in eachindex(mList)
+                _, twoptString = construct_trento_names(
+                    participants;
+                    extensionString = extensionString,
+                    mMode = mList[i],
+                    cc = string(lb) * "-" * string(rb),
+                    path = path
+                )
+
+            writedlm(twoptString, finalCorr[cc, 1, 1, 1, i, :, :])
+
+            end
+
+        else
+            bg_file_flag, twpt_file_flag = check_for_config(participants; extensionString = extensionString, path = path, cc = string(lb) * "-" * string(rb))
+            
+            if bg_file_flag && twpt_file_flag
+
+            bg[cc, :] = collect(readdlm(bgString, eltype(r_grid)))
+            for i in eachindex(mList)
+                _, twoptString = construct_trento_names(
+                    participants;
+                    extensionString = extensionString,
+                    mMode = mList[i],
+                    cc = string(lb) * "-" * string(rb),
+                    path = path
+                )
+                finalCorr[cc, 1, 1, 1, i, :, :] = collect(readdlm(twoptString, eltype(r_grid)))
+            end
+        else
+            bg, finalCorr = generate_bg_twpt_fct(f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; minBiasEvents = minBiasEvents, r_grid = r_grid, NumPhiPoints = NumPhiPoints, Threaded = Threaded, Nfields = Nfields)
+            writedlm(bgString, bg[cc, :])
+            # Generate two-point correlation functions
+            @inbounds  for i in eachindex(mList)
+                _, twoptString = construct_trento_names(
+                    participants;
+                    extensionString = extensionString,
+                    mMode = mList[i],
+                    cc = string(lb) * "-" * string(rb),
+                    path = path
+                )
+
+            writedlm(twoptString, finalCorr[cc, 1, 1, 1, i, :, :])
             end
         end
+        end
     end
-    return bg, correlator
+
+    return bg, finalCorr
+
 end

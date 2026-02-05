@@ -127,4 +127,26 @@ using Test
         invf = InverseFunction(x -> 2 * x)
         @test isapprox(invf(4.0), 2.0; atol = 1.0e-6)
     end
+
+    @testset "Generate Background and Two Point Function" begin
+        bins = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+        fmGeV = 5.0
+        entropy(T) = 47.5 * 4 * T^3 * pi^2 / 90 * fmGeV^3
+        entropyToTemp = InverseFunction(entropy)
+        dSdT(T) = 1 / (3 * 47.5 * 4 * T^2 * pi^2 / 90 * fmGeV^2)
+
+        bg, twpt = MonteCarloGlauber.generate_bg_twpt_fct(
+            entropyToTemp,
+            dSdT,
+            1.0,
+            Lead(),
+            Lead(), 0.5,
+            1.0,
+            0.0,
+            2760, bins, [2, 3]; minBiasEvents = 1000, r_grid = 0:1.0:5
+        )
+        @test all(isreal.(bg))
+        @test all(isreal.(twpt))
+
+    end
 end
