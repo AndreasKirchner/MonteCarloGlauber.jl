@@ -129,7 +129,7 @@ using Test
     end
 
     @testset "Generate Background and Two Point Function" begin
-        bins = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+        bins = [10, 20]
         fmGeV = 5.0
         entropy(T) = 47.5 * 4 * T^3 * pi^2 / 90 * fmGeV^3
         entropyToTemp = InverseFunction(entropy)

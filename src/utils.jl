@@ -418,7 +418,7 @@ function change_norm(f, delta_factor, bg, tw_pt_entropy, new_norm, old_norm)
         @inbounds for m in 1:mLen
             @inbounds for r1 in 1:rLen
                 @inbounds for r2 in r1:rLen
-                    tw_pt_entropy[cc, 1, 1, 1, m, r1, r2] = tw_pt_entropy[cc, 1, 1, 1, m, r1, r2] * inv_delta_factor(bg[cc, r1]) * inv_delta_factor(bg[cc, r2]) *delta_factor(rescaled_bg[cc, r1]) * delta_factor(rescaled_bg[cc, r2]) * (rescaling_factor^2)
+                    tw_pt_entropy[cc, 1, 1, 1, m, r1, r2] = tw_pt_entropy[cc, 1, 1, 1, m, r1, r2] * inv_delta_factor(bg[cc, r1]) * inv_delta_factor(bg[cc, r2]) * delta_factor(rescaled_bg[cc, r1]) * delta_factor(rescaled_bg[cc, r2]) * (rescaling_factor^2)
                     tw_pt_entropy[cc, 1, 1, 1, m, r2, r1] = tw_pt_entropy[cc, 1, 1, 1, m, r1, r2]
                 end
             end
@@ -596,11 +596,11 @@ function generate_tw_pt_fct_entropy(batches, bins, r_grid, m_list, Norm; NumPhiP
                 @inbounds for r2 in r1:length(r_grid)
                     finalCorrelator[cc, 1, 1, 1, m, r1, r2] = real(second_cumulant(batches[cc], r_grid[r1], r_grid[r2], m_list[m], Norm, NumPhiPoints))
                     finalCorrelator[cc, 1, 1, 1, m, r2, r1] = finalCorrelator[cc, 1, 1, 1, m, r1, r2]
-                #end
+                    #end
+                end
             end
         end
     end
-end
     return finalCorrelator
 end
 """
@@ -661,12 +661,12 @@ High-level routine that generates a background profile and converts two-point co
 # Notes
 - This wrapper samples events (threaded if requested), computes background (`generate_bg`) and entropy-space correlators (`generate_tw_pt_fct_entropy`) and then applies `delta_factor` pointwise to obtain `correlator`.
 """
-function generate_bg_twpt_fct(f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; minBiasEvents = 1000000, r_grid = 0:1.:10, NumPhiPoints = 20, Threaded = true, Nfields = 10)
+function generate_bg_twpt_fct(f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; minBiasEvents = 1000000, r_grid = 0:1.0:10, NumPhiPoints = 20, Threaded = true, Nfields = 10)
     # Basic validation
     if (length(bins) + 1) * 100 > minBiasEvents
         error("Not enough events for number of bins, increase minBiasEvents")
     end
-    
+
     participants = Participants(Projectile1, Projectile2, w, sqrtS, k, p)
     if Threaded
         events = rand(threaded(participants), minBiasEvents)
@@ -724,8 +724,8 @@ Behavior
     `writedlm`/`readdlm` for I/O.
 """
 function generate_bg_two_pt_fct_save(
-       f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; 
-       minBiasEvents = 1000000, r_grid = 0:1.:10, NumPhiPoints = 20, Threaded = true, Nfields = 10,
+        f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList;
+        minBiasEvents = 1000000, r_grid = 0:1.0:10, NumPhiPoints = 20, Threaded = true, Nfields = 10,
         extensionString::String = "dat", path::String = "./", override_files::Bool = false
     )
 
@@ -749,40 +749,7 @@ function generate_bg_two_pt_fct_save(
         )[1]
 
         if override_files
-           
-           bg, finalCorr = generate_bg_twpt_fct(f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; minBiasEvents = minBiasEvents, r_grid = r_grid, NumPhiPoints = NumPhiPoints, Threaded = Threaded, Nfields = Nfields)
-            writedlm(bgString, bg[cc, :])
-            # Generate two-point correlation functions
-            @inbounds  for i in eachindex(mList)
-                _, twoptString = construct_trento_names(
-                    participants;
-                    extensionString = extensionString,
-                    mMode = mList[i],
-                    cc = string(lb) * "-" * string(rb),
-                    path = path
-                )
 
-            writedlm(twoptString, finalCorr[cc, 1, 1, 1, i, :, :])
-
-            end
-
-        else
-            bg_file_flag, twpt_file_flag = check_for_config(participants; extensionString = extensionString, path = path, cc = string(lb) * "-" * string(rb))
-            
-            if bg_file_flag && twpt_file_flag
-
-            bg[cc, :] = collect(readdlm(bgString, eltype(r_grid)))
-            for i in eachindex(mList)
-                _, twoptString = construct_trento_names(
-                    participants;
-                    extensionString = extensionString,
-                    mMode = mList[i],
-                    cc = string(lb) * "-" * string(rb),
-                    path = path
-                )
-                finalCorr[cc, 1, 1, 1, i, :, :] = collect(readdlm(twoptString, eltype(r_grid)))
-            end
-        else
             bg, finalCorr = generate_bg_twpt_fct(f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; minBiasEvents = minBiasEvents, r_grid = r_grid, NumPhiPoints = NumPhiPoints, Threaded = Threaded, Nfields = Nfields)
             writedlm(bgString, bg[cc, :])
             # Generate two-point correlation functions
@@ -795,9 +762,42 @@ function generate_bg_two_pt_fct_save(
                     path = path
                 )
 
-            writedlm(twoptString, finalCorr[cc, 1, 1, 1, i, :, :])
+                writedlm(twoptString, finalCorr[cc, 1, 1, 1, i, :, :])
+
             end
-        end
+
+        else
+            bg_file_flag, twpt_file_flag = check_for_config(participants; extensionString = extensionString, path = path, cc = string(lb) * "-" * string(rb))
+
+            if bg_file_flag && twpt_file_flag
+
+                bg[cc, :] = collect(readdlm(bgString, eltype(r_grid)))
+                for i in eachindex(mList)
+                    _, twoptString = construct_trento_names(
+                        participants;
+                        extensionString = extensionString,
+                        mMode = mList[i],
+                        cc = string(lb) * "-" * string(rb),
+                        path = path
+                    )
+                    finalCorr[cc, 1, 1, 1, i, :, :] = collect(readdlm(twoptString, eltype(r_grid)))
+                end
+            else
+                bg, finalCorr = generate_bg_twpt_fct(f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; minBiasEvents = minBiasEvents, r_grid = r_grid, NumPhiPoints = NumPhiPoints, Threaded = Threaded, Nfields = Nfields)
+                writedlm(bgString, bg[cc, :])
+                # Generate two-point correlation functions
+                @inbounds  for i in eachindex(mList)
+                    _, twoptString = construct_trento_names(
+                        participants;
+                        extensionString = extensionString,
+                        mMode = mList[i],
+                        cc = string(lb) * "-" * string(rb),
+                        path = path
+                    )
+
+                    writedlm(twoptString, finalCorr[cc, 1, 1, 1, i, :, :])
+                end
+            end
         end
     end
 
