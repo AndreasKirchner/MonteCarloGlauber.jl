@@ -35,9 +35,11 @@ events = rand(threaded(participants), 100_000)
 ```julia
 mult = multiplicity.(events)
 coll = getfield.(events, :n_coll)
-
 b = impactParameter.(events)
 ```
+<p align="center">
+  <img src="docs/src/assets/histograms.png" width="600">
+</p>
 
 ## Evaluate an Event on a Grid
 `Participant` objects are callable and return the fluctuating thickness at `(x, y)`:
@@ -45,3 +47,7 @@ b = impactParameter.(events)
 evt = events[1]
 profile = [evt(x, y) for x in -10:0.5:10, y in -10:0.5:10]
 ```
+<p align="center">
+  <img src="docs/src/assets/example_plot.png" width="600">
+</p>
+

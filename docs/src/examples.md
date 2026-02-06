@@ -26,20 +26,39 @@ entropy(T) = 47.5 * 4 * T^3 * pi^2 / 90 * fmGeV^3
 entropyToTemp = InverseFunction(entropy)
 dSdT(T) = 1 / (3 * 47.5 * 4 * T^2 * pi^2 / 90 * fmGeV^2)
 
-bg, twopt = generate_bg_two_pt_fct(
-    entropyToTemp,
-    dSdT,
-    1.0,
-    Lead(),
-    Lead(),
-    0.5,
-    1.0,
-    0.0,
-    2760,
-    [10, 20],
-    [2];
-    minBiasEvents = 10_000,
-    r_grid = 0:1:10,
-    nFields = 10,
-)
+m_list = [2,3]
+
+bg, twpt = generate_bg_twpt_fct(entropyToTemp,dSdT,
+    Norm,
+    n1,n2,w ,k,p,s_NN, 
+    bins, m_list; 
+    minBiasEvents = 1000, r_grid = 0:1.:5, NumPhiPoints = 20, Threaded = true, Nfields = 10)
 ```
+
+The function return an error if not enough minBiasEvents are provided for the selected amount of bins.
+
+## Background and Two-Point Correlator with File I/O
+
+You can also generate the background profiles and two-point correlators while automatically saving them to disk using `generate_bg_twpt_fct_save`. This function processes each centrality bin separately, allowing it to read previously computed results and avoid recomputation.
+
+```julia
+bg, twpt = generate_bg_twpt_fct_save(entropyToTemp, dSdT,
+    1.0,
+    n1, n2, w ,k,p,s_NN,
+    bins, m_list;
+    minBiasEvents = 1000,
+    r_grid = 0:1.:5,
+    NumPhiPoints = 20,
+    Threaded = true,
+    Nfields = 10,
+    path = "./results/",
+    override_files = false)
+```
+
+The function will:
+- Create a `Participants` object and sample events for each centrality bin.
+- Write background profiles and correlators to disk using the naming convention from `construct_trento_names`.
+- If files already exist and `override_files=false`, it will read from disk instead of recomputing.
+- Return the full `bg` array and correlator tensor `twpt` across all bins.
+
+This approach is useful for expensive calculations or workflows where you need persistent storage of intermediate results.
