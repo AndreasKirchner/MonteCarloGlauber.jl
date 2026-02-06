@@ -60,6 +60,4 @@ profile = map(evt) do x
 end
 heatmap(-10:0.5:10, -10:0.5:10, profile[1])
 ```
-<p align="center">
-  <img src="docs/src/assets/example_plot.png" width="600">
-</p>
+![Example plot](docs/src/assets/example_plot.png)
