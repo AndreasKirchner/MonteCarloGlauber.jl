@@ -61,3 +61,5 @@ end
 heatmap(-10:0.5:10, -10:0.5:10, profile[1])
 ```
 ![Example plot](docs/src/assets/example_plot.png)
+
+More examples can be found in the documentation and under `MonteCarloGlauber/examples/`.

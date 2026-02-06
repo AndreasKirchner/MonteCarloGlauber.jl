@@ -11,11 +11,26 @@ participants = Participants(n1, n2, 0.5, 2760, 1.0, 0.0)
 events = rand(threaded(participants), 200_000)
 
 bins = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-batches = MonteCarloGlauber.centralities_selection_events(events, bins)
+batches = centralities_selection_events(events, bins)
 
 central_0_10 = batches[1]
 peripheral_50_60 = batches[6]
 ```
+
+## Eccentrities
+`epsilon_n_psi_n` computes the n-th eccentricity of a given event. The following script can be used to compute e.g. the average epsilon_2 in the specified centrality classes.
+```julia
+m = 2
+function avg_eccentricity(batch, n)
+    ecc = epsilon_n_psi_n.(batch, n)
+    return mean(getindex.(ecc, 1)), mean(getindex.(ecc, 2))
+end
+ecc2 = [avg_eccentricity(batches[i], m) for i in eachindex(batches)]
+
+ecc2_magnitude = getindex.(ecc2, 1)
+ecc2_angle = getindex.(ecc2, 2)
+```
+![Example plot](assets/eccentricities.png)
 
 ## Background and Two-Point Correlator
 This is a high-level workflow that builds the background profile and correlators. It can be expensive for large `minBiasEvents`.
