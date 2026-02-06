@@ -1,6 +1,6 @@
 name = "MonteCarloGlauber"
 uuid = "975a0a4c-3350-41ca-9a50-68f91c961bd0"
-version = "1.0.0-DEV"
+version = "0.1.0"
 authors = ["Federica Capellino", "Eduardo Grossi", "Andreas Kirchner", "alphabetical order"]
 
 [deps]

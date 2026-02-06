@@ -9,7 +9,7 @@ The MonteCarloGlauber.jl package simulates initial conditions for heavy-ion coll
 To install the package and its dependencies, run:
 ```julia
 import Pkg
-Pkg.add(url = "https://github.com/AndreasKirchner/MonteCarloGlauber.jl")
+Pkg.add("MonteCarloGlauber")
 ```
 Then load the package with:
 ```julia
