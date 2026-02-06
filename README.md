@@ -5,16 +5,6 @@
 
 The MonteCarloGlauber.jl package simulates initial conditions for heavy-ion collisions based on the Glauber model.
 
-## Documentation
-The full documentation lives in `docs/` and is built with Documenter.jl.
-
-Build the docs locally:
-```bash
-julia --project=docs -e 'using Pkg; Pkg.develop(path="."); Pkg.instantiate()'
-julia --project=docs docs/make.jl
-```
-The generated site is in `docs/build/`.
-
 ## Installation
 To install the package and its dependencies, run:
 ```julia
