@@ -38,7 +38,7 @@ coll = getfield.(events, :n_coll)
 b = impactParameter.(events)
 ```
 <p align="center">
-  <img src="docs/src/assets/histograms.png" width="600">
+  <img src="assets/histograms.png" width="600">
 </p>
 
 ## Evaluate an Event on a Grid
@@ -48,6 +48,6 @@ evt = events[1]
 profile = [evt(x, y) for x in -10:0.5:10, y in -10:0.5:10]
 ```
 <p align="center">
-  <img src="docs/src/assets/example_plot.png" width="600">
+  <img src="assets/example_plot.png" width="600">
 </p>
 

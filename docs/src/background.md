@@ -6,6 +6,7 @@ The Glauber model here exposes the following common parameters:
 - `k`: Fluctuation (shape) parameter for Gamma-distributed participant weights.
 - `p`: Reduced thickness parameter in the generalized mean.
 - `s_NN`: Center-of-mass energy in GeV; used to compute the inelastic cross section.
+- `Norm` : Normalization of entropy density profile
 
 ## Impact Parameter
 When you call `Participants(n1, n2, w, s_NN, k, p)` without an explicit impact parameter range, the code generates minimum-bias events with an internal default range. To restrict the impact parameter distribution, pass a tuple `(bmin, bmax)` as the last positional argument:

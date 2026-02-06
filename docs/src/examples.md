@@ -26,6 +26,7 @@ entropy(T) = 47.5 * 4 * T^3 * pi^2 / 90 * fmGeV^3
 entropyToTemp = InverseFunction(entropy)
 dSdT(T) = 1 / (3 * 47.5 * 4 * T^2 * pi^2 / 90 * fmGeV^2)
 
+Norm = 100
 m_list = [2,3]
 
 bg, twpt = generate_bg_twpt_fct(entropyToTemp,dSdT,
@@ -43,7 +44,7 @@ You can also generate the background profiles and two-point correlators while au
 
 ```julia
 bg, twpt = generate_bg_twpt_fct_save(entropyToTemp, dSdT,
-    1.0,
+    Norm,
     n1, n2, w ,k,p,s_NN,
     bins, m_list;
     minBiasEvents = 1000,
