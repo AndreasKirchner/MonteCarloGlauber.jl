@@ -2,6 +2,9 @@
 
 [![Build Status](https://github.com/AndreasKirchner/MonteCarloGlauber.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/AndreasKirchner/MonteCarloGlauber.jl/actions/workflows/CI.yml?query=branch%3Amain)
 [![Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://andreaskirchner.github.io/MonteCarloGlauber.jl/dev/)
+[![Docs (stable)](https://img.shields.io/badge/docs-stable-blue.svg)](https://andreaskirchner.github.io/MonteCarloGlauber.jl/stable)
+[![Docs (dev)](https://img.shields.io/badge/docs-dev-orange.svg)](https://andreaskirchner.github.io/MonteCarloGlauber.jl/dev)
+
 
 The MonteCarloGlauber.jl package simulates initial conditions for heavy-ion collisions based on the Glauber model.
 
