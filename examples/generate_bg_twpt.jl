@@ -15,7 +15,7 @@ dSdT(T) = 1 / (3 * 47.5 * 4 * T^2 * pi^2 / 90 * fmGeV^2)
 
 Norm = 100
 m_list = [2, 3]
-bins = [10,20]
+bins = [10, 20]
 
 bg, twpt = generate_bg_twpt_fct(
     entropyToTemp, dSdT,
@@ -39,5 +39,5 @@ bg, twpt = generate_bg_twpt_fct_save(
 )
 
 
-heatmap(twpt[1,1,1,1,1,:,:])
-plot(bg[1,:])
+heatmap(twpt[1, 1, 1, 1, 1, :, :])
+plot(bg[1, :])
