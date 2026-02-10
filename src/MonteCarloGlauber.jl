@@ -81,7 +81,7 @@ const root_light_ion = artifact"light_ion_conf"
 
 export NucleiWoodSaxon3D, IntegratedWoodSaxonInterp, IntegratedWoodSaxon, Participants, Participant, threaded, Threaded, rand, TabulatedEvent
 
-export impactParameter, multiplicity, center_of_mass, centralities_selection
+export impactParameter, multiplicity, center_of_mass, centralities_selection_events, epsilon_n_psi_n
 
 export InverseFunction
 

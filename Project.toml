@@ -1,7 +1,7 @@
 name = "MonteCarloGlauber"
 uuid = "975a0a4c-3350-41ca-9a50-68f91c961bd0"
-version = "1.0.0-DEV"
-authors = ["Eduardo Grossi", "Andreas Kirchner"]
+version = "0.1.0"
+authors = ["Federica Capellino", "Eduardo Grossi", "Andreas Kirchner", "alphabetical order"]
 
 [deps]
 Artifacts = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"

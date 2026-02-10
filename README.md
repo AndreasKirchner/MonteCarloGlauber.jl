@@ -1,25 +1,17 @@
 # MonteCarloGlauber
 
 [![Build Status](https://github.com/AndreasKirchner/MonteCarloGlauber.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/AndreasKirchner/MonteCarloGlauber.jl/actions/workflows/CI.yml?query=branch%3Amain)
-[![Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://andreaskirchner.github.io/MonteCarloGlauber.jl/dev/)
+[![Docs (stable)](https://img.shields.io/badge/docs-stable-blue.svg)](https://andreaskirchner.github.io/MonteCarloGlauber.jl/stable)
+[![Docs (dev)](https://img.shields.io/badge/docs-dev-orange.svg)](https://andreaskirchner.github.io/MonteCarloGlauber.jl/dev)
+
 
 The MonteCarloGlauber.jl package simulates initial conditions for heavy-ion collisions based on the Glauber model.
-
-## Documentation
-The full documentation lives in `docs/` and is built with Documenter.jl.
-
-Build the docs locally:
-```bash
-julia --project=docs -e 'using Pkg; Pkg.develop(path="."); Pkg.instantiate()'
-julia --project=docs docs/make.jl
-```
-The generated site is in `docs/build/`.
 
 ## Installation
 To install the package and its dependencies, run:
 ```julia
 import Pkg
-Pkg.add(url = "https://github.com/AndreasKirchner/MonteCarloGlauber.jl")
+Pkg.add("MonteCarloGlauber")
 ```
 Then load the package with:
 ```julia
@@ -60,6 +52,6 @@ profile = map(evt) do x
 end
 heatmap(-10:0.5:10, -10:0.5:10, profile[1])
 ```
-<p align="center">
-  <img src="docs/src/assets/example_plot.png" width="600">
-</p>
+![Example plot](docs/src/assets/example_plot.png)
+
+More examples can be found in the documentation and under `MonteCarloGlauber/examples/`.

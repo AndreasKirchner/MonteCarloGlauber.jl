@@ -191,10 +191,6 @@ Constructor for the Participants distribution. It takes the following arguments:
     p: Norm parameter
     b: Impact parameter distribution (optional) 
 """
-function Participants
-
-    end
-
 function Participants(n1, n2, w, s_NN, k, p, b::Tuple{T1, T2}; Nr = 64, Nth = 32) where {T1 <: Real, T2 <: Real}
 
     sigma_NN = cross_section_from_energy(s_NN)
