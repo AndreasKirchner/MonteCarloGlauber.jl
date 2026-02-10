@@ -87,7 +87,7 @@ export InverseFunction
 
 export Uranium, Lead, Gold, Copper, Xenon, Oxygen, Neon
 
-export generate_bg, generate_tw_pt_fct_entropy, generate_bg_twpt_fct, change_norm, generate_bg_two_pt_fct_save
+export generate_bg, generate_tw_pt_fct_entropy, generate_bg_twpt_fct, change_norm, generate_bg_twpt_fct_save
 
 
 end

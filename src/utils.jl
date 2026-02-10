@@ -454,6 +454,7 @@ function mean_at(configuration, r_1, m, len)
         end
     end
 end
+
 function mean_at(configuration, r_1, len)
     return mean(configuration) do conf
         mean(range(0, 2pi, len)) do θ_1
@@ -463,72 +464,70 @@ function mean_at(configuration, r_1, len)
         end
     end
 end
-"""
-    second_cumulant(configuration, r_1, r_2, m, norm, len)
 
-Estimate the connected two-point cumulant ⟨ s^(m)(r_1) s^(-m)(r_2) ⟩_c across events using angular sampling.
+"""
+    compute_mode_covariance(batches, r_grid, m, norm; n_phi=64) -> Matrix{ComplexF64}
+
+Compute the event-by-event covariance of the m-th azimuthal Fourier mode of the fluctuating thickness function.
+
+This function performs three main steps:
+1. **Discretize and Project**: Projects each event's thickness profile onto the m-th Fourier mode 
+   at discrete radii, integrating over angles via Riemann sum.
+2. **Centering**: Subtracts the mean mode profile across events to compute connected correlations.
+3. **Covariance Matrix**: Computes the normalized outer product of centered modes via BLAS.
 
 # Arguments
-- `configuration`: Collection of callables `conf(x, y)` representing event profiles.
-- `r_1`, `r_2`: Radial positions where the moments are sampled.
-- `m`: Harmonic order.
-- `norm`: Multiplicative normalization applied to `conf(x,y)` when computing moments.
-- `len`: Number of angular sampling points used for each angular integral.
+- `batches::Vector{Participant}`: Collection of collision events, each callable as `event(x, y)` 
+  to return the thickness at position `(x, y)`.
+- `r_grid::AbstractVector{<:Real}`: Radii at which to sample the thickness profile. Typically created 
+  as `range(r_min, r_max, length=n_r)`.
+- `m::Integer`: Azimuthal harmonic order (e.g., `m=2` for elliptic flow, `m=3` for triangular).
+- `norm::Real`: Normalization constant applied to each thickness evaluation.
+- `n_phi::Integer`: Number of angular grid points for Riemann quadrature (default: 64).
 
 # Returns
-- `Complex`: Estimated connected two-point cumulant normalized by number of events and sampling points.
+- `C_m::Matrix{ComplexF64}`: Connected covariance matrix of shape `(Nr, Nr)` where 
+  `C_m[r1, r2] = <s_m(r1) * conj(s_m(r2))>_c`. The `[r,r]` diagonal contains variances of the m-th mode.
+
+# Mathematical Details
+
+For a single event, the m-th Fourier moment at radius ``r`` is computed as:
+```
+s_m(r) = (norm/n_phi) Σ_φ T(r, φ) e^{-i m φ}
+```
+where ``T(r, φ)`` is the thickness at polar coordinates `(r, φ)`.
+
+The connected covariance is then:
+```
+C_m[r1, r2] = (1/Nev) Σ_i (s̃_m^i(r1) * s̃_m^i*(r2))
+s̃_m^i(r) = s_m^i(r) - <s_m(r)>
+```
 
 # Notes
-- The implementation computes per-event double angular sums and subtracts the disconnected contribution.
-- The returned quantity is (result - ⟨s^m⟩ ⟨s^-m⟩)/(Nev * len^2).
+- The function uses `Threads.@threads` for event-loop parallelization.
+- Complex values arise from the Fourier phase factor `e^{-i m φ}`.
+- The returned matrix is Hermitian (approximately, up to numerical precision) when 
+  computed from a large event sample.
+
+# Example
+```julia
+participants = Participants(n1, n2, 0.5, 200.0, 1.0, 0.0)
+events = rand(participants, 10_000)
+r_grid = range(0, 15, length=50)
+C_2 = compute_mode_covariance(events, r_grid, 2, 1.0; n_phi=20)
+```
+
+See also: [`generate_tw_pt_fct_entropy`](@ref)
 """
-function second_cumulant(configuration, r_1, r_2, m, norm, len)
-    result = zero(first(configuration)(r_1, r_2)im)
-    result_av = zero(result)
-    result_av_cc = zero(result)
-    nevnet = length(configuration)
-    θrange = range(0, 2pi, len)
-    for i_conf in eachindex(configuration)
-        @inbounds conf = configuration[i_conf]
-        sums = zero(result)
-        sumaverege = zero(result)
-        sumaverage_cc = zero(result)
-        for θ_1 in θrange
-            s1, c1 = sincos(θ_1)
-            x_1 = r_1 * c1
-            y_1 = r_1 * s1
-            c_1 = norm * conf(x_1, y_1)
-            sfirst, cfirst = sincos(m * θ_1)
-            firstfactor = c_1 * (cfirst + im * sfirst)
-            sumaverege += firstfactor #<s^m(r)>
-            for θ_2 in θrange
-                s2, c2 = sincos(θ_2)
-                x_2 = r_2 * c2
-                y_2 = r_2 * s2
-                c_2 = norm * conf(x_2, y_2)
-                sdiff, cdiff = sincos(m * (θ_2))
-                sums += c_2 * (cdiff - im * sdiff) * firstfactor
-                sumaverage_cc = c_2 * (cdiff - im * sdiff)
-            end
-        end
-        result += sums
-        result_av += sumaverege
-        result_av_cc += sumaverage_cc
-    end
-    return real(result - result_av * result_av_cc / nevnet) / (nevnet * len * len)
-end
-
-
-
-function compute_mode_covariance(batches, r_grid, m, norm; n_phi=64)
+function compute_mode_covariance(batches, r_grid, m, norm; n_phi = 64)
     Nev = length(batches)
     Nr = length(r_grid)
-    phi_grid = range(0, 2π, length=n_phi+1)[1:end-1]
-    
+    phi_grid = range(0, 2π, length = n_phi + 1)[1:(end - 1)]
+
     # Pre-allocate the S_m matrix (Events x Radius)
     # Using ComplexF64 because Fourier modes are complex
     Sm = zeros(ComplexF64, Nev, Nr)
-    
+
     # Pre-calculate the Fourier phase factor to avoid repeating exp()
     phases = exp.(-im * m .* phi_grid) ./ n_phi
 
@@ -552,18 +551,18 @@ function compute_mode_covariance(batches, r_grid, m, norm; n_phi=64)
 
     # 2. Centering the matrix
     # subtract the mean profile across events
-    Sm_centered = Sm .- mean(Sm, dims=1)
+    Sm_centered = Sm .- mean(Sm, dims = 1)
 
     # 3. Fast Matrix Multiplication (The BLAS magic)
     # C_m[r1, r2] = <s_m(r1) s_m*(r2)> - <s_m(r1)><s_m*(r2)>
     # Sm' is the conjugate transpose (Hermitian adjoint)
-    C_m = (1/Nev) * (Sm_centered' * Sm_centered)
-    
+    C_m = (1 / Nev) * (Sm_centered' * Sm_centered)
+
     return C_m
 end
 
 """
-    generate_bg(fun, batches, bins, r_grid, Norm; NumPhiPoints=20)
+    generate_bg(fun, batches, bins, r_grid, Norm; NumPhiPoints=20,, threaded = true)
 
 Generate a background radial profile from event batches.
 
@@ -626,41 +625,11 @@ function generate_tw_pt_fct_entropy(batches, bins, r_grid, m_list, Norm; NumPhiP
     finalCorrelator = zeros(eltype(r_grid), length(bins), 2, Nfields, Nfields, length(m_list), length(r_grid), length(r_grid))
     @inbounds for cc in 1:(length(batches) - 1)
         @inbounds for m in eachindex(m_list)
-                    finalCorrelator[cc, 1, 1, 1, m, :, :] = real.(compute_mode_covariance(batches[cc], r_grid, m_list[m], Norm; n_phi=NumPhiPoints))
+            finalCorrelator[cc, 1, 1, 1, m, :, :] = real.(compute_mode_covariance(batches[cc], r_grid, m_list[m], Norm; n_phi = NumPhiPoints))
         end
     end
     return finalCorrelator
 end
-
-#=
-function generate_tw_pt_fct_entropy(batches, bins, r_grid, m_list, Norm; NumPhiPoints = 20, Nfields = 10)
-    finalCorrelator = zeros(eltype(r_grid), length(bins), 2, Nfields, Nfields, length(m_list), length(r_grid), length(r_grid))
-    #=   if threaded
-        fakeCorrelator = zeros(eltype(r_grid), length(bins), length(m_list), length(r_grid), length(r_grid))
-        Threads.@threads for I in CartesianIndices(fakeCorrelator)
-            cc = I[1]
-            m = I[2]
-            r1 = I[3]
-            r2 = I[4]
-            finalCorrelator[cc, 1, 1, 1, m, r1, r2] = real(second_cumulant(batches[cc], r_grid[r1], r_grid[r2], m_list[m], Norm, NumPhiPoints))
-            finalCorrelator[cc, 1, 1, 1, m, r2, r1] = finalCorrelator[cc, 1, 1, 1, m, r1, r2]
-        end
-    else=#
-    @inbounds for cc in 1:(length(batches) - 1)
-        @inbounds for m in eachindex(m_list)
-            @inbounds for r1 in eachindex(r_grid)
-                @inbounds for r2 in r1:length(r_grid)
-                    finalCorrelator[cc, 1, 1, 1, m, r1, r2] = real(second_cumulant(batches[cc], r_grid[r1], r_grid[r2], m_list[m], Norm, NumPhiPoints))
-                    finalCorrelator[cc, 1, 1, 1, m, r2, r1] = finalCorrelator[cc, 1, 1, 1, m, r1, r2]
-                    #end
-                end
-            end
-        end
-    end
-    return finalCorrelator
-end
-=#
-
 """
         eos_convert_correlator!(tw_pt_entropy, delta_factor, bg)
 
@@ -687,19 +656,36 @@ function eos_convert_correlator!(tw_pt_entropy, delta_factor, bg) #TODO: is it f
     ccLen = size(bg, 1)
     rLen = size(tw_pt_entropy, 6)
     mLen = size(tw_pt_entropy, 5)
+
+    # Pre-allocate delta_vals buffer to avoid repeated allocations across centrality bins
+    delta_vals = Vector{Float64}(undef, rLen)
+
     @inbounds for cc in 1:ccLen
+        # Compute all delta_factor values for this centrality bin
+        for r in 1:rLen
+            delta_vals[r] = delta_factor(bg[cc, r])
+        end
+
+        # Create view to reduce indexing depth from 7D to 3D dimensions
+        tw_pt_view = @view tw_pt_entropy[cc, 1, 1, 1, :, :, :]
+
         @inbounds for m in 1:mLen
             @inbounds for r1 in 1:rLen
-                @inbounds for r2 in r1:rLen
-                    tw_pt_entropy[cc, 1, 1, 1, m, r1, r2] = tw_pt_entropy[cc, 1, 1, 1, m, r1, r2] * delta_factor(bg[cc, r1]) * delta_factor(bg[cc, r2])
-                    tw_pt_entropy[cc, 1, 1, 1, m, r2, r1] = tw_pt_entropy[cc, 1, 1, 1, m, r1, r2]
+                delta_r1 = delta_vals[r1]
+                # Use @simd for vectorization on the innermost loop (no dependencies)
+                @simd for r2 in r1:rLen
+                    factor = delta_r1 * delta_vals[r2]
+                    tw_pt_view[m, r1, r2] *= factor
+                end
+                # Symmetrize after the loop to avoid conflicts with @simd
+                for r2 in r1:rLen
+                    tw_pt_view[m, r2, r1] = tw_pt_view[m, r1, r2]
                 end
             end
         end
     end
     return tw_pt_entropy
 end
-
 """
     generate_bg_twpt_fct(f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; ...)
 
@@ -732,12 +718,13 @@ function generate_bg_twpt_fct(f, delta_factor, norm, Projectile1, Projectile2, w
         events = rand(participants, minBiasEvents)
     end
     batches = centralities_selection_events(events, bins)
-    bg = generate_bg(f, batches, bins, r_grid, norm; NumPhiPoints = NumPhiPoints)
+    bg = generate_bg(f, batches, bins, r_grid, norm; NumPhiPoints = NumPhiPoints, threaded = Threaded)
     tw_pt_entropy = generate_tw_pt_fct_entropy(batches, bins, r_grid, mList, norm; NumPhiPoints = NumPhiPoints, Nfields = Nfields)
     eos_convert_correlator!(tw_pt_entropy, delta_factor, bg)
 
     return bg, tw_pt_entropy
 end
+
 
 """
         generate_bg_two_pt_fct_save(f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; kwargs...)
@@ -781,11 +768,14 @@ Behavior
     are written using `construct_trento_names` to build filenames and
     `writedlm`/`readdlm` for I/O.
 """
-function generate_bg_two_pt_fct_save(
+function generate_bg_twpt_fct_save(
         f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList;
         minBiasEvents = 1000000, r_grid = 0:1.0:10, NumPhiPoints = 20, Threaded = true, Nfields = 10,
         extensionString::String = "dat", path::String = "./", override_files::Bool = false
     )
+
+    # Create directory if it doesn't exist
+    mkpath(path)
 
     # Initialize participant system and arrays
     participants = Participants(Projectile1, Projectile2, w, sqrtS, k, p)
