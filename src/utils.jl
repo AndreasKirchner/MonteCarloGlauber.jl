@@ -518,6 +518,50 @@ function second_cumulant(configuration, r_1, r_2, m, norm, len)
     return real(result - result_av * result_av_cc / nevnet) / (nevnet * len * len)
 end
 
+
+
+function compute_mode_covariance(batches, r_grid, m, norm; n_phi=64)
+    Nev = length(batches)
+    Nr = length(r_grid)
+    phi_grid = range(0, 2π, length=n_phi+1)[1:end-1]
+    
+    # Pre-allocate the S_m matrix (Events x Radius)
+    # Using ComplexF64 because Fourier modes are complex
+    Sm = zeros(ComplexF64, Nev, Nr)
+    
+    # Pre-calculate the Fourier phase factor to avoid repeating exp()
+    phases = exp.(-im * m .* phi_grid) ./ n_phi
+
+    # 1. Discretize and Project (The most time-consuming part)
+    # Using @threads if your functions are thread-safe
+    Threads.@threads for i in 1:Nev
+        f = batches[i]
+        for j in 1:Nr
+            r = r_grid[j]
+            # Manual integration for the m-th mode
+            val = 0.0 + 0.0im
+            for k in 1:n_phi
+                # Convert polar (r, phi) to (x, y) for the function evaluator
+                x = r * cos(phi_grid[k])
+                y = r * sin(phi_grid[k])
+                val += norm * f(x, y) * phases[k]
+            end
+            Sm[i, j] = val
+        end
+    end
+
+    # 2. Centering the matrix
+    # subtract the mean profile across events
+    Sm_centered = Sm .- mean(Sm, dims=1)
+
+    # 3. Fast Matrix Multiplication (The BLAS magic)
+    # C_m[r1, r2] = <s_m(r1) s_m*(r2)> - <s_m(r1)><s_m*(r2)>
+    # Sm' is the conjugate transpose (Hermitian adjoint)
+    C_m = (1/Nev) * (Sm_centered' * Sm_centered)
+    
+    return C_m
+end
+
 """
     generate_bg(fun, batches, bins, r_grid, Norm; NumPhiPoints=20)
 
@@ -577,6 +621,18 @@ Compute entropy two-point correlators <δSδS>_c for a list of harmonics.
 # Notes
 - Only the [1,1] field indices are filled by the current implementation; other field indices remain zero.
 """
+
+function generate_tw_pt_fct_entropy(batches, bins, r_grid, m_list, Norm; NumPhiPoints = 20, Nfields = 10)
+    finalCorrelator = zeros(eltype(r_grid), length(bins), 2, Nfields, Nfields, length(m_list), length(r_grid), length(r_grid))
+    @inbounds for cc in 1:(length(batches) - 1)
+        @inbounds for m in eachindex(m_list)
+                    finalCorrelator[cc, 1, 1, 1, m, :, :] = real.(compute_mode_covariance(batches[cc], r_grid, m_list[m], Norm; n_phi=NumPhiPoints))
+        end
+    end
+    return finalCorrelator
+end
+
+#=
 function generate_tw_pt_fct_entropy(batches, bins, r_grid, m_list, Norm; NumPhiPoints = 20, Nfields = 10)
     finalCorrelator = zeros(eltype(r_grid), length(bins), 2, Nfields, Nfields, length(m_list), length(r_grid), length(r_grid))
     #=   if threaded
@@ -603,6 +659,8 @@ function generate_tw_pt_fct_entropy(batches, bins, r_grid, m_list, Norm; NumPhiP
     end
     return finalCorrelator
 end
+=#
+
 """
         eos_convert_correlator!(tw_pt_entropy, delta_factor, bg)
 
