@@ -521,6 +521,7 @@ See also: [`generate_tw_pt_fct_entropy`](@ref)
 """
 function compute_mode_covariance(batches, r_grid, m, norm; n_phi = 64)
     Nev = length(batches)
+
     Nr = length(r_grid)
     phi_grid = range(0, 2π, length = n_phi + 1)[1:(end - 1)]
 
@@ -533,22 +534,23 @@ function compute_mode_covariance(batches, r_grid, m, norm; n_phi = 64)
 
     # 1. Discretize and Project (The most time-consuming part)
     # Using @threads if your functions are thread-safe
-    Threads.@threads for i in 1:Nev
-        f = batches[i]
-        for j in 1:Nr
-            r = r_grid[j]
-            # Manual integration for the m-th mode
+    Threads.@threads for j in 1:Nr
+        r = r_grid[j]
+        for i in 1:Nev
+            f = batches[i]
             val = 0.0 + 0.0im
             for k in 1:n_phi
-                # Convert polar (r, phi) to (x, y) for the function evaluator
+                # Pre-computing these or using a faster f(x,y) helps
                 x = r * cos(phi_grid[k])
                 y = r * sin(phi_grid[k])
-                val += norm * f(x, y) * phases[k]
+
+                val += max(norm * f(x, y), 9.0e-2) * phases[k]
+                # val += norm*f(x,y)*phases[k]
+
             end
             Sm[i, j] = val
         end
     end
-
     # 2. Centering the matrix
     # subtract the mean profile across events
     Sm_centered = Sm .- mean(Sm, dims = 1)
@@ -557,7 +559,6 @@ function compute_mode_covariance(batches, r_grid, m, norm; n_phi = 64)
     # C_m[r1, r2] = <s_m(r1) s_m*(r2)> - <s_m(r1)><s_m*(r2)>
     # Sm' is the conjugate transpose (Hermitian adjoint)
     C_m = (1 / Nev) * (Sm_centered' * Sm_centered)
-
     return C_m
 end
 
@@ -597,6 +598,7 @@ function generate_bg(fun, batches, bins, r_grid, Norm; NumPhiPoints = 20, thread
             end
         end
     end
+
     return fun.(Norm .* bg)
 
 end
@@ -679,13 +681,14 @@ function eos_convert_correlator!(tw_pt_entropy, delta_factor, bg) #TODO: is it f
                 end
                 # Symmetrize after the loop to avoid conflicts with @simd
                 for r2 in r1:rLen
-                    tw_pt_view[m, r2, r1] = tw_pt_view[m, r1, r2]
+                    tw_pt_view[m, r2, r1] = conj(tw_pt_view[m, r1, r2])
                 end
             end
         end
     end
     return tw_pt_entropy
 end
+
 """
     generate_bg_twpt_fct(f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; ...)
 
@@ -719,6 +722,13 @@ function generate_bg_twpt_fct(f, delta_factor, norm, Projectile1, Projectile2, w
     end
     batches = centralities_selection_events(events, bins)
     bg = generate_bg(f, batches, bins, r_grid, norm; NumPhiPoints = NumPhiPoints, threaded = Threaded)
+
+    # TODO do we want a flat tail?
+    for cc_batches in 1:(length(batches) - 1)
+        idx = findfirst(x -> x < 0.05, bg[cc_batches, :])
+        bg[cc_batches, idx:end] .= bg[cc_batches, idx]
+    end
+
     tw_pt_entropy = generate_tw_pt_fct_entropy(batches, bins, r_grid, mList, norm; NumPhiPoints = NumPhiPoints, Nfields = Nfields)
     eos_convert_correlator!(tw_pt_entropy, delta_factor, bg)
 
