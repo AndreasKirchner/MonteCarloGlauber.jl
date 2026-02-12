@@ -521,43 +521,28 @@ See also: [`generate_tw_pt_fct_entropy`](@ref)
 """
 function compute_mode_covariance(batches, r_grid, m, norm; n_phi = 64)
     Nev = length(batches)
-
     Nr = length(r_grid)
     phi_grid = range(0, 2π, length = n_phi + 1)[1:(end - 1)]
-
-    # Pre-allocate the S_m matrix (Events x Radius)
-    # Using ComplexF64 because Fourier modes are complex
     Sm = zeros(ComplexF64, Nev, Nr)
-
-    # Pre-calculate the Fourier phase factor to avoid repeating exp()
     phases = exp.(-im * m .* phi_grid) ./ n_phi
 
-    # 1. Discretize and Project (The most time-consuming part)
-    # Using @threads if your functions are thread-safe
     Threads.@threads for j in 1:Nr
         r = r_grid[j]
         for i in 1:Nev
             f = batches[i]
             val = 0.0 + 0.0im
             for k in 1:n_phi
-                # Pre-computing these or using a faster f(x,y) helps
                 x = r * cos(phi_grid[k])
                 y = r * sin(phi_grid[k])
 
-                val += max(norm * f(x, y), 9.0e-2) * phases[k]
-                # val += norm*f(x,y)*phases[k]
+                #val += max(norm * f(x, y), 9.0e-2) * phases[k]
+                val += norm * f(x, y) * phases[k]
 
             end
             Sm[i, j] = val
         end
     end
-    # 2. Centering the matrix
-    # subtract the mean profile across events
     Sm_centered = Sm .- mean(Sm, dims = 1)
-
-    # 3. Fast Matrix Multiplication (The BLAS magic)
-    # C_m[r1, r2] = <s_m(r1) s_m*(r2)> - <s_m(r1)><s_m*(r2)>
-    # Sm' is the conjugate transpose (Hermitian adjoint)
     C_m = (1 / Nev) * (Sm_centered' * Sm_centered)
     return C_m
 end
@@ -709,6 +694,26 @@ High-level routine that generates a background profile and converts two-point co
 - This wrapper samples events (threaded if requested), computes background (`generate_bg`) and entropy-space correlators (`generate_tw_pt_fct_entropy`) and then applies `delta_factor` pointwise to obtain `correlator`.
 """
 function generate_bg_twpt_fct(f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; minBiasEvents = 1000000, r_grid = 0:1.0:10, NumPhiPoints = 20, Threaded = true, Nfields = 10)
+    # Basic validation
+    if (length(bins) + 1) * 100 > minBiasEvents
+        error("Not enough events for number of bins, increase minBiasEvents")
+    end
+
+    participants = Participants(Projectile1, Projectile2, w, sqrtS, k, p)
+    if Threaded
+        events = rand(threaded(participants), minBiasEvents)
+    else
+        events = rand(participants, minBiasEvents)
+    end
+    batches = centralities_selection_events(events, bins)
+    bg = generate_bg(f, batches, bins, r_grid, norm; NumPhiPoints = NumPhiPoints, threaded = Threaded)
+    tw_pt_entropy = generate_tw_pt_fct_entropy(batches, bins, r_grid, mList, norm; NumPhiPoints = NumPhiPoints, Nfields = Nfields)
+    eos_convert_correlator!(tw_pt_entropy, delta_factor, bg)
+
+    return bg, tw_pt_entropy
+end
+
+function generate_bg_twpt_fct_flat_extrapolation(f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; minBiasEvents = 1000000, r_grid = 0:1.0:10, NumPhiPoints = 20, Threaded = true, Nfields = 10)
     # Basic validation
     if (length(bins) + 1) * 100 > minBiasEvents
         error("Not enough events for number of bins, increase minBiasEvents")
