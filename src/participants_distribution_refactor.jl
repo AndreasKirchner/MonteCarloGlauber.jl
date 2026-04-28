@@ -180,18 +180,25 @@ struct Participants{A, B, C, D, E, F, G, H, L} <: Sampleable{Univariate, Partici
 end
 
 """
-    Participants(n1,n2,w,s_NN,k,p[,b])
+    Participants(n1, n2, w, s_NN, k, p[, b]; Nr=32, Nth=32, impact_parameter_angle=Uniform(0,2π))
 
-Constructor for the Participants distribution. It takes the following arguments:
-    n1: Nucleus 1
-    n2: Nucleus 2
-    w: Subnucleon width
-    s_NN: Energy in GeV
-    k: Shape parameter
-    p: Norm parameter
-    b: Impact parameter distribution (optional) 
+Constructor for the `Participants` distribution.
+
+# Positional arguments
+- `n1` — nucleus sampler for the first colliding nucleus.
+- `n2` — nucleus sampler for the second colliding nucleus.
+- `w` — sub-nucleon Gaussian width (σ) for the transverse matter distribution.
+- `s_NN` — centre-of-mass energy per nucleon pair (GeV); used to derive the inelastic nucleon–nucleon cross section σ_NN.
+- `k` — shape parameter of the Gamma distribution used to sample per-participant fluctuation weights.
+- `p` — exponent for the thickness power-mean combination (`p = 0` selects the geometric mean).
+- `b` — (optional) two-element tuple `(b_min, b_max)` setting the range of the impact-parameter distribution. Defaults to `(0, 3(R1+R2)+6w)`.
+
+# Keyword arguments
+- `Nr` — number of radial grid points used for the accumulation pre-computation (default: `32`; `64` when `b` is provided explicitly).
+- `Nth` — number of angular grid points for the accumulation pre-computation (default: `32`).
+- `impact_parameter_angle` — distribution from which the azimuthal orientation of the impact parameter is drawn (default: `Uniform(0, 2π)`).
 """
-function Participants(n1, n2, w, s_NN, k, p, b::Tuple{T1, T2}; Nr = 64, Nth = 32) where {T1 <: Real, T2 <: Real}
+function Participants(n1, n2, w, s_NN, k, p, b::Tuple{T1, T2}; Nr = 64, Nth = 32,impact_parameter_angle = Uniform(0, 2pi)) where {T1 <: Real, T2 <: Real}
 
     sigma_NN = cross_section_from_energy(s_NN)
     f(sigmagg, p) = totalcross_section(w, sigmagg, sigma_NN)
@@ -204,7 +211,7 @@ function Participants(n1, n2, w, s_NN, k, p, b::Tuple{T1, T2}; Nr = 64, Nth = 32
     R2 = n2.R
     prep = prepare_accumulation(R1, R2, Nr, Nth)
 
-    return Participants(n1, n2, w, truncated(TriangularDist(0, b[2], b[2]), b[1], b[2]), Uniform(0, 2pi), sigg, k, sigma_NN, p, prep)
+    return Participants(n1, n2, w, truncated(TriangularDist(0, b[2], b[2]), b[1], b[2]), impact_parameter_angle, sigg, k, sigma_NN, p, prep)
 
 end
 
@@ -212,13 +219,13 @@ end
 dimension(s::Participants{A, B, C, D, E, F, G, L, H}) where {A, B, C, D, E, F, G, L, H} = 1
 
 
-function Participants(n1, n2, w, s_NN, k, p; Nr = 32, Nth = 32)
+function Participants(n1, n2, w, s_NN, k, p; Nr = 32, Nth = 32, impact_parameter_angle = Uniform(0, 2pi))
 
     R1 = n1.R
     R2 = n2.R
 
     b = (0, 3(R1 + R2) + 6 * w)
-    return Participants(n1, n2, w, s_NN, k, p, b; Nr = Nr, Nth = Nth)
+    return Participants(n1, n2, w, s_NN, k, p, b; Nr = Nr, Nth = Nth, impact_parameter_angle = impact_parameter_angle)
 end
 
 function Base.eltype(::Participants{A, B, C, D, E, F, G, H, L}) where {A, B, C, D, E, F, G, H, L}
@@ -235,7 +242,7 @@ function Base.copy(s::Participants{A, B, C, D, E, F, G, H, L}) where {A, B, C, D
 
     return Participants(
         copy(s.nucl1), copy(s.nucl2), s.sub_nucleon_width,
-        truncated(TriangularDist(0, b[2], b[2]), b[1], b[2]), Uniform(0, 2pi), s.sigma_gg, s.shape_parameter, s.total_cross_section, s.p, deepcopy(s.accumulation_preparation)
+        truncated(TriangularDist(0, b[2], b[2]), b[1], b[2]), deepcopy(s.inpact_parameter_angle), s.sigma_gg, s.shape_parameter, s.total_cross_section, s.p, deepcopy(s.accumulation_preparation)
     )
 
 end
