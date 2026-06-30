@@ -95,6 +95,12 @@ end
 
 end
 
+@inline function ncoll_fluctuating_thickness(f::Participant{T, S, V, M, C, D, F}) where {T, S, V, M, C, D, F}
+
+    return (x, y) -> ncoll_fluctuating_thickness(x, y, f)
+
+end
+
 """
     fluctuating_thickness(x, y, f::Participant)
 
@@ -147,6 +153,54 @@ end
 
 
 """
+    ncoll_fluctuating_thickness(x, y, f::Participant, σin)
+
+Compute the number of binary collisions fluctuating transverse thickness at coordinates `(x,y)` for a given `Participant` event interacting with cross section σin.
+
+The thickness contributions from each participating nucleon are modelled as normalized Gaussians with width `f.sub_nucleon_width` and per‑participant weights (`f.shape1` and `f.shape2`). 
+Returns
+- A scalar giving the local combined thickness value at `(x,y)`.
+"""
+function ncoll_fluctuating_thickness(x::Num1, y::Num2, f::Participant{T, S, V, M, C, D, F}) where {Num1 <: Real, Num2 <: Real, T, S, V, M, C, D, F}
+
+    part1 = f.part1
+    part2 = f.part2
+    shape1 = f.shape1
+    shape2 = f.shape2
+    w = f.sub_nucleon_width
+
+    ta = zero(eltype(f))
+    tb = zero(eltype(f))
+
+    @inbounds @fastmath for i in eachindex(part1)
+        pa_x, pa_y = part1[i]
+        ga = shape1[i]
+        ta += ga * MonteCarloGlauber.Tp(x - pa_x, y - pa_y, w)
+    end
+
+    @inbounds @fastmath for i in eachindex(part2)
+        pa_x, pa_y = part2[i]
+        ga = shape2[i]
+        tb += ga * MonteCarloGlauber.Tp(x - pa_x, y - pa_y, w)
+    end
+
+    return ta * tb
+end
+
+function ncoll_fluctuating_thickness(x::Num1, y::Num2, f::Vector{Participant{T, S, V, M, C, D, F}}) where {Num1 <: Real, Num2 <: Real, T, S, V, M, C, D, F}
+    return map(f) do f_i
+        ncoll_fluctuating_thickness(x, y, f_i)
+    end
+end
+
+@inline function ncoll_fluctuating_thickness(f::Vector{Participant{T, S, V, M, C, D, F}}) where {T, S, V, M, C, D, F}
+    return map(f) do f_i
+        (x, y) -> ncoll_fluctuating_thickness(x, y, f_i)
+    end
+
+
+end
+"""
     Participants{A,B,C,D,E,F,G,H,L}
 
 Container describing a two‑nucleus collision setup and providing a `Sampleable` that generates
@@ -198,7 +252,7 @@ Constructor for the `Participants` distribution.
 - `Nth` — number of angular grid points for the accumulation pre-computation (default: `32`).
 - `impact_parameter_angle` — distribution from which the azimuthal orientation of the impact parameter is drawn (default: `Uniform(0, 2π)`).
 """
-function Participants(n1, n2, w, s_NN, k, p, b::Tuple{T1, T2}; Nr = 64, Nth = 32,impact_parameter_angle = Uniform(0, 2pi)) where {T1 <: Real, T2 <: Real}
+function Participants(n1, n2, w, s_NN, k, p, b::Tuple{T1, T2}; Nr = 64, Nth = 32, impact_parameter_angle = Uniform(0, 2pi)) where {T1 <: Real, T2 <: Real}
 
     sigma_NN = cross_section_from_energy(s_NN)
     f(sigmagg, p) = totalcross_section(w, sigmagg, sigma_NN)

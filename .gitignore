@@ -3,3 +3,9 @@
 /.vscode/
 /docs/build/
 .DS_Store
+*.h5
+*.yaml
+*.out
+*.err
+*.pdf
+*.dat

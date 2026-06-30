@@ -428,22 +428,29 @@ function change_norm(f, delta_factor, bg, tw_pt_entropy, new_norm, old_norm)
     return rescaled_bg, tw_pt_entropy
 end
 
+
 """
     mean_at(configuration, r_1, m, len)
 
-Compute the averaged complex harmonic moment ⟨ s^(m)(r) ⟩ over a set of configurations and angular sampling.
+Compute the averaged complex harmonic moment ⟨ s^(m)(r) ⟩ over configurations and angular directions.
 
 # Arguments
-- `configuration`: Collection (e.g., vector) of callables `conf(x, y)` representing event-by-event profiles.
-- `r_1`: Radial coordinate at which to evaluate the profiles.
-- `m`: Harmonic order (integer).
-- `len`: Number of angular samples to use in the trapezoidal/mean approximation over [0, 2π].
+- `configuration::Vector` — Collection of event profiles (each callable as `conf(x, y)`).
+- `r_1::Real` — Radial coordinate at which to evaluate the profiles.
+- `m::Integer` — Harmonic order for the complex Fourier phase factor.
+- `len::Integer` — Number of angular sampling points for the trapezoidal/mean approximation over [0, 2π].
 
 # Returns
-- `Complex`: Complex mean value ⟨ s^m(r) ⟩ = average_over_events average_over_θ [ conf(r cos θ, r sin θ) * exp(i m θ) ].
+- `Complex`: The harmonic moment ⟨ s^m(r) ⟩ = average_over_events average_over_θ [ conf(r cos θ, r sin θ) * exp(i m θ) ].
 
 # Notes
-- Angular integration is approximated by sampling `len` points in [0, 2π].
+- Angular integration is approximated by uniform sampling of `len` points in [0, 2π].
+- The result is a complex value encoding both magnitude and phase information about the m-th Fourier component.
+
+# Example
+```julia
+s2_moment = mean_at(event_batch, 5.0, 2, 20)  # Elliptic flow moment
+```
 """
 function mean_at(configuration, r_1, m, len)
     return mean(configuration) do conf
@@ -455,6 +462,22 @@ function mean_at(configuration, r_1, m, len)
     end
 end
 
+"""
+    mean_at(configuration, r_1, len)
+
+Compute the azimuthally-averaged radial profile at a fixed radius over a collection of configurations.
+
+# Arguments
+- `configuration::Vector` — Collection of event profiles (each callable as `conf(x, y)`).
+- `r_1::Real` — Radial coordinate at which to evaluate the profiles.
+- `len::Integer` — Number of angular sampling points for averaging over [0, 2π].
+
+# Returns
+- `Real`: The average profile value ⟨ T(r) ⟩ = average_over_events average_over_θ [ conf(r cos θ, r sin θ) ].
+
+# Notes
+- This variant computes the isotropic (zeroth harmonic) average without Fourier phase factors.
+"""
 function mean_at(configuration, r_1, len)
     return mean(configuration) do conf
         mean(range(0, 2pi, len)) do θ_1
@@ -587,6 +610,116 @@ function generate_bg(fun, batches, bins, r_grid, Norm; NumPhiPoints = 20, thread
     return fun.(Norm .* bg)
 
 end
+
+"""
+    generate_ncoll(batches, bins, r_grid; NumPhiPoints=20, threaded=true)
+
+Compute the number-of-collisions fluctuating thickness profile (binary collision density) for event batches.
+
+# Arguments
+- `batches::Vector` — Event batches (vectors of `Participant` profiles), one per centrality bin.
+- `bins` — Bin definitions (length should match `batches`).
+- `r_grid::Vector{Real}` — Radial points at which to evaluate the ncoll thickness.
+- `NumPhiPoints::Integer` (default: 20) — Angular sampling points for azimuthal averaging.
+- `threaded::Bool` (default: true) — Use multithreading for computation.
+
+# Returns
+- `ncoll::Matrix{Float64}` — Array of shape `(length(bins), length(r_grid))` containing the ncoll profile for each bin and radius.
+
+# Notes
+- Returns the product `T_A(r,θ) * T_B(r,θ)` (the "ncoll thickness"), which encodes the binary collision density.
+- Useful for studying initial-state fluctuations in the number of binary collisions.
+
+# Example
+```julia
+ncoll_prof = generate_ncoll(batches, bins, r_grid; NumPhiPoints=20)
+```
+"""
+function generate_ncoll(batches, bins, r_grid; NumPhiPoints = 20, threaded = true)
+    ncoll = zeros(eltype(r_grid), length(bins), length(r_grid))
+    if threaded
+        Threads.@threads for I in CartesianIndices(ncoll)
+            cc_batches = I[1]
+            r_i = I[2]
+            r = r_grid[r_i]
+            ncoll[cc_batches, r_i] = mean_at(ncoll_fluctuating_thickness(batches[cc_batches]), r, NumPhiPoints)
+        end
+    else
+        for cc_batches in 1:(length(batches) - 1)
+            for r_i in eachindex(r_grid)
+                r = r_grid[r_i]
+                ncoll[cc_batches, r_i] = mean_at(ncoll_fluctuating_thickness(batches[cc_batches]), r, NumPhiPoints)
+            end
+        end
+    end
+
+    return ncoll
+
+end
+
+function generate_bg(f, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins; minBiasEvents = 1000, r_grid = 0:1.0:10, NumPhiPoints = 20, Threaded = true)
+    # Basic validation
+    if (length(bins) + 1) * 100 > minBiasEvents
+        error("Not enough events for number of bins, increase minBiasEvents")
+    end
+
+    participants = Participants(Projectile1, Projectile2, w, sqrtS, k, p)
+    if Threaded
+        events = rand(threaded(participants), minBiasEvents)
+    else
+        events = rand(participants, minBiasEvents)
+    end
+    batches = centralities_selection_events(events, bins)
+    bg = generate_bg(f, batches, bins, r_grid, norm; NumPhiPoints = NumPhiPoints, threaded = Threaded)
+    return bg
+end
+
+"""
+    generate_ncoll(Projectile1, Projectile2, w, k, p, sqrtS, bins; minBiasEvents=1000, r_grid=0:1.0:10, NumPhiPoints=20, Threaded=true)
+
+High-level routine that generates collision events and computes the number-of-collisions thickness profile.
+
+# Arguments
+- `Projectile1`, `Projectile2` — Nucleus samplers for the two colliding nuclei.
+- `w::Real` — Sub-nucleon Gaussian width.
+- `k::Real` — Shape parameter for participant Gamma-weight fluctuations.
+- `p::Real` — Power-mean exponent for thickness combination (p=0 selects geometric mean).
+- `sqrtS::Real` — Center-of-mass energy per nucleon pair (GeV).
+- `bins::Vector` — Centrality bin boundaries (as percentiles, e.g., [10, 20, 30] for 0-10%, 10-20%, 20-30%).
+- `minBiasEvents::Int` (default: 1000) — Total number of events to generate.
+- `r_grid::Range` (default: 0:1.0:10) — Radial sampling points.
+- `NumPhiPoints::Int` (default: 20) — Angular sampling resolution.
+- `Threaded::Bool` (default: true) — Use multithreading for event generation.
+
+# Returns
+- `ncoll::Matrix{Float64}` — Binary collision thickness profile of shape `(length(bins), length(r_grid))`.
+
+# Notes
+- Validation ensures `(length(bins) + 1) * 100 ≤ minBiasEvents` to guarantee sufficient events per bin.
+- The ncoll thickness encodes the pattern of binary collisions and is sensitive to initial-state fluctuations.
+
+# Example
+```julia
+ncoll_prof = generate_ncoll(Lead(), Gold(), 0.5, 1.0, 0.0, 200.0, [10, 20, 30]; minBiasEvents=10000, r_grid=0:0.5:15)
+```
+"""
+function generate_ncoll(Projectile1, Projectile2, w, k, p, sqrtS, bins; minBiasEvents = 1000, r_grid = 0:1.0:10, NumPhiPoints = 20, Threaded = true)
+    # Basic validation
+    if (length(bins) + 1) * 100 > minBiasEvents
+        error("Not enough events for number of bins, increase minBiasEvents")
+    end
+
+    participants = Participants(Projectile1, Projectile2, w, sqrtS, k, p)
+    if Threaded
+        events = rand(threaded(participants), minBiasEvents)
+    else
+        events = rand(participants, minBiasEvents)
+    end
+    batches = centralities_selection_events(events, bins)
+    bg = generate_ncoll(batches, bins, r_grid; NumPhiPoints = NumPhiPoints, threaded = Threaded)
+    return bg
+end
+
 """
     generate_tw_pt_fct_entropy(batches, bins, r_grid, m_list, Norm; NumPhiPoints=20, Nfields=10)
 
@@ -713,6 +846,43 @@ function generate_bg_twpt_fct(f, delta_factor, norm, Projectile1, Projectile2, w
     return bg, tw_pt_entropy
 end
 
+"""
+    generate_bg_twpt_fct_flat_extrapolation(f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; ...)
+
+Generate background and two-point correlators with flat extrapolation beyond small background values.
+
+# Arguments
+- `f::Function` — Equation-of-state function applied to the normalized background.
+- `delta_factor::Function` — Conversion factor from entropy to the target observable (applied to correlators).
+- `norm` — Normalization factor applied to profiles.
+- `Projectile1`, `Projectile2` — Nucleus samplers for the two colliding nuclei.
+- `w`, `k`, `p`, `sqrtS` — Parameters defining the collision system and participant sampling.
+- `bins::Vector` — Centrality bin boundaries.
+- `mList::Vector` — List of harmonic orders for two-point function computation.
+- `minBiasEvents::Int` (default: 1_000_000) — Number of generated events.
+- `r_grid::Range` (default: 0:1.:10) — Radial sampling points.
+- `NumPhiPoints::Int` (default: 20) — Angular sampling resolution.
+- `Threaded::Bool` (default: true) — Use multithreading for generation.
+- `Nfields::Int` (default: 10) — Number of fields stored in correlator tensor.
+
+# Returns
+- `(bg, correlator)` — Background profile and two-point correlator tensor, both with flat extrapolation applied.
+
+# Behavior
+- Identical to [`generate_bg_twpt_fct`](@ref) except that any radial point with background value < 0.05 is replaced with the first small value found, ensuring monotonic extrapolation at small backgrounds.
+- Useful for avoiding numerical issues when the background drops to very small values far from the core.
+
+# Notes
+- Flat extrapolation prevents the background from approaching zero at large radii and can improve numerical stability in downstream analyses.
+
+# Example
+```julia
+bg, corr = generate_bg_twpt_fct_flat_extrapolation(
+    f, delta_factor, norm, Pb, Au, 0.5, 1.0, 0.0, 200.0, [10,20,30], [2,3];
+    minBiasEvents=10_000_000
+)
+```
+"""
 function generate_bg_twpt_fct_flat_extrapolation(f, delta_factor, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins, mList; minBiasEvents = 1000000, r_grid = 0:1.0:10, NumPhiPoints = 20, Threaded = true, Nfields = 10)
     # Basic validation
     if (length(bins) + 1) * 100 > minBiasEvents
@@ -728,7 +898,6 @@ function generate_bg_twpt_fct_flat_extrapolation(f, delta_factor, norm, Projecti
     batches = centralities_selection_events(events, bins)
     bg = generate_bg(f, batches, bins, r_grid, norm; NumPhiPoints = NumPhiPoints, threaded = Threaded)
 
-    # TODO do we want a flat tail?
     for cc_batches in 1:(length(batches) - 1)
         idx = findfirst(x -> x < 0.05, bg[cc_batches, :])
         bg[cc_batches, idx:end] .= bg[cc_batches, idx]
