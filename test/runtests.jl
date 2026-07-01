@@ -151,13 +151,13 @@ using Test
     end
 
     @testset "Generate Background and ncoll save" begin
-        
+
         tmpdir = mkpath("./res/")
         bins = [10, 20]
         fmGeV = 5.0
         entropy(T) = 47.5 * 4 * T^3 * pi^2 / 90 * fmGeV^3
         entropyToTemp = InverseFunction(entropy)
-        
+
         bg, ncoll = MonteCarloGlauber.generate_bg_ncoll_save(
             entropyToTemp,
             1.0,
