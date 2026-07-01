@@ -657,6 +657,30 @@ function generate_ncoll(batches, bins, r_grid; NumPhiPoints = 20, threaded = tru
 
 end
 
+
+"""
+    generate_bg(f, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins; minBiasEvents=1000, r_grid=0:1.0:10, NumPhiPoints=20, Threaded=true)
+
+High-level routine that generates collision events and computes the number-of-collisions thickness profile.
+
+# Arguments
+- `f`: Function applied to the normalized background values (e.g., equation-of-state transform).
+- `norm`: Normalization factor applied to profiles before averaging.
+- `Projectile1`, `Projectile2` — Nucleus samplers for the two colliding nuclei.
+- `w::Real` — Sub-nucleon Gaussian width.
+- `k::Real` — Shape parameter for participant Gamma-weight fluctuations.
+- `p::Real` — Power-mean exponent for thickness combination (p=0 selects geometric mean).
+- `sqrtS::Real` — Center-of-mass energy per nucleon pair (GeV).
+- `bins::Vector` — Centrality bin boundaries (as percentiles, e.g., [10, 20, 30] for 0-10%, 10-20%, 20-30%).
+- `minBiasEvents::Int` (default: 1000) — Total number of events to generate.
+- `r_grid::Range` (default: 0:1.0:10) — Radial sampling points.
+- `NumPhiPoints::Int` (default: 20) — Angular sampling resolution.
+- `Threaded::Bool` (default: true) — Use multithreading for event generation.
+
+# Returns
+- `bg::Matrix{Float64}` — Binary collision thickness profile of shape `(length(bins), length(r_grid))`.
+"""
+
 function generate_bg(f, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins; minBiasEvents = 1000, r_grid = 0:1.0:10, NumPhiPoints = 20, Threaded = true)
     # Basic validation
     if (length(bins) + 1) * 100 > minBiasEvents
@@ -718,6 +742,123 @@ function generate_ncoll(Projectile1, Projectile2, w, k, p, sqrtS, bins; minBiasE
     batches = centralities_selection_events(events, bins)
     bg = generate_ncoll(batches, bins, r_grid; NumPhiPoints = NumPhiPoints, threaded = Threaded)
     return bg
+end
+"""
+    generate_bg_ncoll(f, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins; minBiasEvents=1000, r_grid=0:1.0:10, NumPhiPoints=20, Threaded=true)
+
+High-level routine that generates collision events and computes the number-of-collisions thickness profile.
+
+# Arguments
+- `f`: Function applied to the normalized background values (e.g., equation-of-state transform).
+- `norm`: Normalization factor applied to profiles before averaging.
+- `Projectile1`, `Projectile2` — Nucleus samplers for the two colliding nuclei.
+- `w::Real` — Sub-nucleon Gaussian width.
+- `k::Real` — Shape parameter for participant Gamma-weight fluctuations.
+- `p::Real` — Power-mean exponent for thickness combination (p=0 selects geometric mean).
+- `sqrtS::Real` — Center-of-mass energy per nucleon pair (GeV).
+- `bins::Vector` — Centrality bin boundaries (as percentiles, e.g., [10, 20, 30] for 0-10%, 10-20%, 20-30%).
+- `minBiasEvents::Int` (default: 1000) — Total number of events to generate.
+- `r_grid::Range` (default: 0:1.0:10) — Radial sampling points.
+- `NumPhiPoints::Int` (default: 20) — Angular sampling resolution.
+- `Threaded::Bool` (default: true) — Use multithreading for event generation.
+
+# Returns
+- `bg::Matrix{Float64}, ncoll::Matrix{Float64}` — Binary collision thickness profile of shape `(length(bins), length(r_grid))`.
+"""
+function generate_bg_ncoll(f, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins; minBiasEvents = 1000, r_grid = 0:1.0:10, NumPhiPoints = 20, Threaded = true)
+    # Basic validation
+    if (length(bins) + 1) * 100 > minBiasEvents
+        error("Not enough events for number of bins, increase minBiasEvents")
+    end
+
+    participants = Participants(Projectile1, Projectile2, w, sqrtS, k, p)
+    if Threaded
+        events = rand(threaded(participants), minBiasEvents)
+    else
+        events = rand(participants, minBiasEvents)
+    end
+    batches = centralities_selection_events(events, bins)
+    bg = generate_bg(f, batches, bins, r_grid, norm; NumPhiPoints = NumPhiPoints, threaded = Threaded)
+    ncoll = generate_ncoll(batches, bins, r_grid; NumPhiPoints = NumPhiPoints, threaded = Threaded)
+    return bg, ncoll
+end
+
+"""
+    generate_bg_ncoll_save(f, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins; kwargs...)
+
+Generate and optionally save background and binary-collision profiles for each centrality bin.
+
+# Arguments
+- `f::Function`: Function applied to the raw background values to produce the physical background.
+- `norm`: Normalization factor passed to background generation.
+- `Projectile1`, `Projectile2`, `w`, `k`, `p`, `sqrtS`: Parameters used to construct the `Participants` object.
+- `bins::AbstractVector`: Centrality bin edges used to partition events.
+
+# Keyword arguments
+- `minBiasEvents`: Number of sampled events (default: `1000`).
+- `r_grid`: Radial sampling points (default: `0:1.0:10`).
+- `NumPhiPoints`: Number of angular sample points for integrals (default: `20`).
+- `Threaded`: Use threaded event sampling when true (default: `true`).
+- `extensionString::String`: File extension for saved outputs (default: `"dat"`).
+- `path::String`: Directory to read/write files (default: `"./"`).
+- `override_files::Bool`: If true, recompute and overwrite existing files (default: `false`).
+
+# Returns
+- `(bg, ncoll)`: Arrays of shape `(length(bins), length(r_grid))` containing the background and ncoll profiles for each centrality bin.
+
+# Behavior
+- For each centrality bin, this function checks whether background and ncoll files already exist.
+- If they do and `override_files == false`, it loads them from disk.
+- Otherwise it recomputes them with `generate_bg_ncoll` and writes the results.
+"""
+function generate_bg_ncoll_save(
+        f, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins;
+        minBiasEvents = 1000, r_grid = 0:1.0:10, NumPhiPoints = 20, Threaded = true,
+        extensionString::String = "dat", path::String = "./", override_files::Bool = false
+    )
+
+    mkpath(path)
+
+    participants = Participants(Projectile1, Projectile2, w, sqrtS, k, p)
+    bg = zeros(eltype(r_grid), length(bins), length(r_grid))
+    ncoll = zeros(eltype(r_grid), length(bins), length(r_grid))
+
+    for cc in eachindex(bins)
+        lb = cc == 1 ? 0 : bins[cc - 1]
+        rb = bins[cc]
+
+        bgString = construct_trento_names(
+            participants;
+            extensionString = extensionString,
+            cc = string(lb) * "-" * string(rb),
+            path = path
+        )[1]
+        ncollString = path * "ncoll_" * string(lb) * "_" * string(rb) * "." * extensionString
+
+        if override_files
+            bg_all, ncoll_all = generate_bg_ncoll(f, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins; minBiasEvents = minBiasEvents, r_grid = r_grid, NumPhiPoints = NumPhiPoints, Threaded = Threaded)
+            bg[cc, :] = bg_all[cc, :]
+            ncoll[cc, :] = ncoll_all[cc, :]
+            writedlm(bgString, bg[cc, :])
+            writedlm(ncollString, ncoll[cc, :])
+        else
+            bg_file_flag = isfile(bgString)
+            ncoll_file_flag = isfile(ncollString)
+
+            if bg_file_flag && ncoll_file_flag
+                bg[cc, :] = collect(readdlm(bgString, eltype(r_grid)))
+                ncoll[cc, :] = collect(readdlm(ncollString, eltype(r_grid)))
+            else
+                bg_all, ncoll_all = generate_bg_ncoll(f, norm, Projectile1, Projectile2, w, k, p, sqrtS, bins; minBiasEvents = minBiasEvents, r_grid = r_grid, NumPhiPoints = NumPhiPoints, Threaded = Threaded)
+                bg[cc, :] = bg_all[cc, :]
+                ncoll[cc, :] = ncoll_all[cc, :]
+                writedlm(bgString, bg[cc, :])
+                writedlm(ncollString, ncoll[cc, :])
+            end
+        end
+    end
+
+    return bg, ncoll
 end
 
 """
