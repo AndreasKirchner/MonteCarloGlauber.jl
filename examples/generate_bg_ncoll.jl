@@ -26,4 +26,3 @@ plot(transpose(T), label = "T [GeV]")
 plot(transpose(ncoll), label = "ncoll [fm-2]")
 
 T, ncoll = generate_bg_ncoll_save(entropyToTemp, Norm, n1, n2, w, k, p, s_NN, centrality_bins)
-
