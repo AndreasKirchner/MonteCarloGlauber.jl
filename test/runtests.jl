@@ -150,15 +150,14 @@ using Test
 
     end
 
-    @testset "Generate Background and ncoll save" begin
+    @testset "Generate Background and ncoll" begin
 
-        tmpdir = mkpath("./res/")
         bins = [10, 20]
         fmGeV = 5.0
         entropy(T) = 47.5 * 4 * T^3 * pi^2 / 90 * fmGeV^3
         entropyToTemp = InverseFunction(entropy)
 
-        bg, ncoll = MonteCarloGlauber.generate_bg_ncoll_save(
+        bg, ncoll = MonteCarloGlauber.generate_bg_ncoll(
             entropyToTemp,
             1.0,
             Lead(),
@@ -169,9 +168,7 @@ using Test
             2760,
             bins;
             minBiasEvents = 1000,
-            r_grid = 0:1.0:2,
-            path = tmpdir,
-            override_files = false
+            r_grid = 0:1.0:2
         )
 
         @test all(isreal.(bg))
@@ -179,7 +176,5 @@ using Test
 
         @test size(bg) == (length(bins), length(0:1.0:2))
         @test size(ncoll) == (length(bins), length(0:1.0:2))
-        @test length(readdir(tmpdir)) >= 2
-        rm(tmpdir, recursive = true)
     end
 end
