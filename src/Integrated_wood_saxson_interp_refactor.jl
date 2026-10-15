@@ -94,22 +94,24 @@ function IntegratedWoodSaxonInterp(N_nucleon, α, R, ρ₀, w, burning_time, ret
 end
 
 """
-    IntegratedWoodSaxonInterp(N_nucleon, α, R, ρ₀, w; rng=Random.default_rng(), rotated=true)
+    IntegratedWoodSaxonInterp(N_nucleon, α, R, ρ₀, w; rotated=true, retol=1e-3, Npoint=100, rng=Random.default_rng(), burning_time=1000)
+    IntegratedWoodSaxonInterp(N_nucleon, α, R, ρ₀, w, rng[, rotated])
 
 Create an `IntegratedWoodSaxonInterp` using sensible defaults for integration and sampling parameters.
 
-Defaults
-- `burning_time = 1000`
-- `retol = 1.0e-3`
-- `Npoint = 100`
+Keyword defaults
+- `rotated = true` — apply a random 2D rotation to every sampled configuration
+- `retol = 1.0e-3`, `Npoint = 100` — quadrature tolerance and grid points for the interpolant
+- `burning_time`, `rng` — unused, kept for backward compatibility
 
 Use this lightweight constructor for typical usage; it delegates to the full constructor which builds the interpolant and the rejection sampler. Sample configurations with `rand` (or `Distributions._rand!`) to obtain an `(N_nucleon, 2)` matrix of positions.
 """
-function IntegratedWoodSaxonInterp(N_nucleon, α, R, ρ₀, w, rng = Random.default_rng(), rotated = true)
-    burning_time = 1000
-    retol = 1.0e-3
-    Npoint = 100
+function IntegratedWoodSaxonInterp(N_nucleon, α, R, ρ₀, w; rotated::Bool = true, retol = 1.0e-3, Npoint = 100, rng = Random.default_rng(), burning_time = 1000)
     return IntegratedWoodSaxonInterp(N_nucleon, α, R, ρ₀, w, burning_time, retol, Npoint, rng, rotated)
+end
+
+function IntegratedWoodSaxonInterp(N_nucleon, α, R, ρ₀, w, rng::AbstractRNG, rotated::Bool = true)
+    return IntegratedWoodSaxonInterp(N_nucleon, α, R, ρ₀, w; rng = rng, rotated = rotated)
 end
 
 # immutable and stateless (interpolant and rejection sampler are read-only): sharing between threads is safe

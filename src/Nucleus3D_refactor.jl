@@ -14,9 +14,11 @@ Fields
 - `burning_time` — unused, kept for backward compatibility.
 - `sampler` — internal `RejectionSampler` that draws exact 3D locations from the deformed density.
 - `d_min` — minimum inter-nucleon separation (when zero no separation enforcement is performed).
+- `rotated` — when `true` (default) each sampled configuration is rotated by a random 3×3 rotation before projection;
+  when `false` the nucleus keeps its intrinsic orientation (symmetry axis along z, i.e. perpendicular to the transverse plane).
 
 Behavior
-- Samples are drawn in 3D using the internal sampler and then a random 3×3 rotation is applied; the object returns transverse (x,y) coordinates (an `(N_nucleon, 2)` array) by projecting the rotated 3D positions.
+- Samples are drawn in 3D using the internal sampler and then, if `rotated`, a random 3×3 rotation is applied; the object returns transverse (x,y) coordinates (an `(N_nucleon, 2)` array) by projecting the 3D positions.
 
 Notes
 - The type implements `Sampleable{ArrayLikeVariate{2}, Continuous}` and is intended for use with `rand`/`Distributions`.
@@ -34,6 +36,7 @@ struct NucleiWoodSaxon3D{T, R, C, W, D1, D2, D3, D4, B, samp} <: Sampleable{Arra
     burning_time::B
     sampler::samp
     d_min::Float64
+    rotated::Bool
 end
 
 """
@@ -133,7 +136,7 @@ end
 
 
 """
-    NucleiWoodSaxon3D(rng::AbstractRNG, N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma, burning_time, dmin)
+    NucleiWoodSaxon3D(rng::AbstractRNG, N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma, burning_time, dmin; rotated = true)
 
 Construct a `NucleiWoodSaxon3D` with explicit RNG, burn-in and minimum-separation parameters.
 
@@ -143,11 +146,12 @@ Arguments
 - `α, R, ρ₀, w, beta2, beta3, beta4, gamma` — Woods–Saxon and deformation parameters (see `density_WS_deformed`).
 - `burning_time` — ignored; kept for backward compatibility (the sampler is exact and needs no burn-in).
 - `dmin` — minimum inter-nucleon separation (stored on the object; not applied here by the constructor).
+- `rotated` (keyword, default `true`) — apply a random 3D rotation to every sampled configuration.
 
 Behavior
 - Constructs a `RejectionSampler` targeting `density_WS_deformed_coeff` on a box that contains the nucleus, and returns a fully configured `NucleiWoodSaxon3D` instance ready for sampling via `rand`.
 """
-function NucleiWoodSaxon3D(rng::AbstractRNG, N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma, burning_time, dmin)
+function NucleiWoodSaxon3D(rng::AbstractRNG, N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma, burning_time, dmin; rotated::Bool = true)
 
     # box large enough to contain the deformed surface plus a 10α tail (ρ/ρ₀ ≈ e^-10 at the edge)
     L = float(R * (1 + abs(beta2) + abs(beta3) + abs(beta4)) + 10 * α)
@@ -157,26 +161,28 @@ function NucleiWoodSaxon3D(rng::AbstractRNG, N_nucleon, α, R, ρ₀, w, beta2, 
     bound = density_WS_deformed_bound(L, α, R, ρ₀, w, beta2, beta3, beta4, gamma)
     sampler = RejectionSampler(density_WS_deformed_coeff, params, (L, L, L), bound)
 
-    return NucleiWoodSaxon3D(N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma, burning_time, sampler, dmin)
+    return NucleiWoodSaxon3D(N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma, burning_time, sampler, dmin, rotated)
 
 end
 
-function NucleiWoodSaxon3D(N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma, dmin)
+function NucleiWoodSaxon3D(N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma, dmin; rotated::Bool = true)
     rng = Random.default_rng()
     burning_time = 1000
-    return NucleiWoodSaxon3D(rng, N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma, burning_time, dmin)
+    return NucleiWoodSaxon3D(rng, N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma, burning_time, dmin; rotated = rotated)
 end
 
 """
-    NucleiWoodSaxon3D(N_nucleon,α,R,ρ₀,w,beta2,beta3,beta4,gamma)
+    NucleiWoodSaxon3D(N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma; rotated = true)
 
 Create a 3D distribution of nucleons in a nucleus with a Wood-Saxon density profile. The density profile is deformed by the parameters `beta2`, `beta3`, `beta4`, and `gamma`. The number of nucleons is `N_nucleon`, the radius is `R`, the diffuseness is `α`, the central density is `ρ₀`, and the skin depth is `w`.
+With `rotated = false` the nucleus keeps its intrinsic orientation (deformation axis along the beam), which is useful for
+studying fixed body–body or tip–tip configurations; the default applies a random rotation to every sample.
 """
-function NucleiWoodSaxon3D(N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma)
+function NucleiWoodSaxon3D(N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma; rotated::Bool = true)
     rng = Random.default_rng()
     burning_time = 1000
     dmin = 0.0
-    return NucleiWoodSaxon3D(rng, N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma, burning_time, dmin)
+    return NucleiWoodSaxon3D(rng, N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma, burning_time, dmin; rotated = rotated)
 end
 
 
@@ -196,7 +202,7 @@ Arguments
 
 Behavior
 - For each nucleon the function draws an independent 3‑vector from the internal `RejectionSampler` via `rand(rng, s.sampler)`.
-- A single random `RotMatrix{3}` is sampled and applied to all nucleon positions; the rotated 3‑vector is projected to `(x,y)` and written into `x`.
+- If `s.rotated`, a single random `RotMatrix{3}` is sampled and applied to all nucleon positions; the 3‑vector is projected to `(x,y)` and written into `x`.
 - If `s.d_min > 0` a minimum-inter-nucleon-separation policy may be applied (implementation detail); when zero no separation policy is enforced.
 
 Returns
@@ -206,33 +212,14 @@ Notes
 - This is a low‑level, allocation‑efficient sampling hook used by the package's `rand` APIs.
 """
 function Distributions._rand!(rng::AbstractRNG, s::NucleiWoodSaxon3D{T, R, C, W, D1, D2, D3, D4, B, samp}, x::DenseMatrix{<:Real}) where {T, R, C, W, D1, D2, D3, D4, B, samp}
-
-    if s.d_min == 0.0
-        rotmatrix = rand(rng, RotMatrix{3})
-        for i in Base.axes(x, 1)
-            xpos = rand(rng, s.sampler)
-            rot = rotmatrix * SVector{3}(xpos)
-            for j in Base.axes(x, 2)
-                x[i, j] = rot[j]
-            end
+    # d_min > 0 is accepted but not yet enforced (see the N-body sampler follow-up)
+    rotmatrix = s.rotated ? rand(rng, RotMatrix{3}) : one(RotMatrix{3})
+    for i in Base.axes(x, 1)
+        xpos = rand(rng, s.sampler)
+        rot = rotmatrix * SVector{3}(xpos)
+        for j in Base.axes(x, 2)
+            x[i, j] = rot[j]
         end
-
-        return x
     end
-
-    if s.d_min > 0
-
-        rotmatrix = rand(rng, RotMatrix{3})
-        for i in Base.axes(x, 1)
-            xpos = rand(rng, s.sampler)
-            rot = rotmatrix * SVector{3}(xpos)
-            for j in Base.axes(x, 2)
-                x[i, j] = rot[j]
-            end
-        end
-
-        return x
-
-    end
-
+    return x
 end

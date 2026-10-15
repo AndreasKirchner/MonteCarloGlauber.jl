@@ -222,6 +222,33 @@ using Test
         @test copy(iws).sampler.params[end] !== iws.sampler.params[end]
     end
 
+    @testset "rotated keyword" begin
+        # 3D deformed nucleus: unrotated keeps the prolate axis along z, so the projected ⟨x²+y²⟩ is smaller
+        u_rot = Uranium()
+        u_fix = Uranium(rotated = false)
+        @test u_rot.rotated && !u_fix.rotated
+        r2(nuc, n) = mean(sum(abs2, rand(rng, nuc)) / nuc.N_nucleon for _ in 1:n)
+        @test r2(u_fix, 400) < 0.95 * r2(u_rot, 400)
+        # spherical nucleus: rotation is irrelevant for the distribution
+        pb_fix = Lead(rotated = false)
+        @test abs(r2(pb_fix, 400) / r2(Lead(), 400) - 1) < 0.03
+        # 2D samplers: keyword and positional forms agree, both orientations sample
+        a = IntegratedWoodSaxonInterp(4, 0.6, 5.0, 1.0, 0.0; rotated = false, Npoint = 20)
+        b = IntegratedWoodSaxonInterp(4, 0.6, 5.0, 1.0, 0.0, rng, false)
+        @test !a.rotated && !b.rotated && a.npoint == 20
+        @test size(rand(rng, a)) == (4, 2)
+        c = IntegratedWoodSaxon(4, 0.6, 5.0, 1.0, 0.0; rotated = false, retol = 1.0e-2)
+        d = IntegratedWoodSaxon(4, 0.6, 5.0, 1.0, 0.0, false, 1.0e-2)
+        @test !c.rotated && !d.rotated && c.retol == 1.0e-2
+        @test size(rand(rng, c)) == (4, 2)
+        # tabulated: unrotated samples are rows of the stored table
+        o_fix = Oxygen(rotated = false)
+        @test !o_fix.rotated
+        s = rand(rng, o_fix)
+        table_xy = Set(Tuple(c[1:2]) for c in eachcol(reshape(o_fix.array, 3, :)))
+        @test all(Tuple(s[i, :]) in table_xy for i in 1:size(s, 1))
+    end
+
     @testset "Light ion tabulated events" begin
         oxygen = Oxygen()
         neon = Neon()

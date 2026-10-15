@@ -1,8 +1,9 @@
 """
-    TabulatedEvent(filename)
+    TabulatedEvent(filename; rotated = true)
 
 Load a set of precomputed light-ion configurations from an HDF5 file and
-construct a `Sampleable` over transverse nucleon positions.
+construct a `Sampleable` over transverse nucleon positions. With `rotated = false`
+the configurations are projected in the orientation stored in the file.
 
 File format
 - The HDF5 file should contain a dataset named `configs` with shape
@@ -31,7 +32,7 @@ struct TabulatedEvent{B} <: Sampleable{ArrayLikeVariate{2}, Continuous}
 
 end
 
-function TabulatedEvent(filename)
+function TabulatedEvent(filename; rotated::Bool = true)
     fid = h5open(filename, "r")
     configs = fid["configs"]
     radius = Float64(
@@ -50,7 +51,7 @@ function TabulatedEvent(filename)
     N_configs = size(configs)[3]
     array = Float64.(read(configs))
     close(fid)
-    return TabulatedEvent(N_nucleon, N_configs, radius, filename, array, true)
+    return TabulatedEvent(N_nucleon, N_configs, radius, filename, array, rotated)
 end
 
 drawIndeces(rng::AbstractRNG, nevents, s::TabulatedEvent) = rand(rng, 1:s.N_configs, nevents)

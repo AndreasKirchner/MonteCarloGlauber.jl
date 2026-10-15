@@ -99,6 +99,7 @@ end
 
 """
     IntegratedWoodSaxon(N_nucleon::Int, α, R, ρ₀, w; rotated=true, retol=1e-3, rng=Random.default_rng(), burning_time=1000)
+    IntegratedWoodSaxon(N_nucleon::Int, α, R, ρ₀, w, rotated[, retol, rng, burning_time])
 
 Construct an `IntegratedWoodSaxon` sampler which draws `N_nucleon` transverse positions per sample by Monte Carlo from the projected
 (2D) Woods–Saxon density. The projected density is obtained by integrating the 3D Woods–Saxon profile along the longitudinal axis
@@ -116,8 +117,12 @@ Notes
 - This constructor builds a `RejectionSampler` with `integrate_charge` as the target and returns a fully configured
   `IntegratedWoodSaxon{typeof(α), typeof(R), typeof(ρ₀), typeof(w), typeof(sampler)}` ready for sampling with `rand`.
 """
+function IntegratedWoodSaxon(N_nucleon::Int, α, R, ρ₀, w; rotated::Bool = true, retol = 1.0e-3, rng = Random.default_rng(), burning_time = 1000)
+    return IntegratedWoodSaxon(N_nucleon, α, R, ρ₀, w, rotated, retol, rng, burning_time)
+end
+
 function IntegratedWoodSaxon(
-        N_nucleon::Int, α, R, ρ₀, w, rotated = true, retol = 1.0e-3
+        N_nucleon::Int, α, R, ρ₀, w, rotated::Bool, retol = 1.0e-3
         , rng = Random.default_rng()
         , burning_time = 1000
     )
