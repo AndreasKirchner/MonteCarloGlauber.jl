@@ -260,12 +260,17 @@ Constructor for the `Participants` distribution.
 function Participants(n1, n2, w, s_NN, k, p, b::Tuple{T1, T2}; Nr = 64, Nth = 32, impact_parameter_angle = Uniform(0, 2pi)) where {T1 <: Real, T2 <: Real}
 
     sigma_NN, sigg = solve_sigma_gg(w, s_NN)
+    b2_cutoff = pair_distance2_cutoff(w, sigg)
+
+    b[1] <= b[2] || throw(ArgumentError("impact-parameter range must satisfy b_min <= b_max, got $b"))
+    b_support = nuclear_extent(n1) + nuclear_extent(n2) + sqrt(b2_cutoff)
+    b[1] <= b_support || throw(ArgumentError("impact-parameter range $b has no collision support: nucleons never come within the collision range for b > $(round(b_support, digits = 2)) fm"))
 
     R1 = n1.R
     R2 = n2.R
     prep = prepare_accumulation(R1, R2, Nr, Nth)
 
-    return Participants(n1, n2, w, truncated(TriangularDist(0, b[2], b[2]), b[1], b[2]), impact_parameter_angle, sigg, k, sigma_NN, pair_distance2_cutoff(w, sigg), p, prep)
+    return Participants(n1, n2, w, truncated(TriangularDist(0, b[2], b[2]), b[1], b[2]), impact_parameter_angle, sigg, k, sigma_NN, b2_cutoff, p, prep)
 
 end
 
@@ -363,6 +368,11 @@ end
 #3d case
 
 """
+Maximum number of consecutive attempts without a binary collision before `rand(::Participants)` raises an error.
+"""
+const MAX_COLLISION_ATTEMPTS = 100_000
+
+"""
     Distributions.rand(rng::AbstractRNG, nucleos::Participants)
 
 Sample a single collision `Participant` event from the configured `Participants` object.
@@ -372,13 +382,17 @@ Arguments
 - `nucleos` — a `Participants` instance describing the two nuclei, sub‑nucleon width, cross sections, and other sampling parameters.
 
 Behavior
-- Draws nucleus configurations `n1`, `n2` and an impact-parameter orientation `θ_b`.
-- Samples an impact-parameter magnitude `b` from `nucleos.inpact_parameter_magitude` and shifts the two nuclei by ±b/2.
+- Each attempt draws fresh nucleus configurations `n1`, `n2`, an impact-parameter orientation `θ_b` and a magnitude `b`
+  from `nucleos.inpact_parameter_magitude`, and shifts the two nuclei by ±b/2. Resampling the full geometry on every
+  attempt (rather than only `b`) is required for the event ensemble to weight configurations by their own collision
+  probability, and guarantees that a geometry with no reachable pair cannot stall the loop.
 - For each nucleon pair closer than `sqrt(nucleos.b2_cutoff)` computes the binary collision probability using `binary_impact_parameter_probability` and accepts collisions via uniform draws; farther pairs (probability below 1e-7) are skipped.
 - If at least one binary collision is discovered, builds a `Participant` containing participating nucleons, samples per-nucleon Gamma weights, recenters to the event center-of-mass (via `center_of_mass!`), and returns the populated `Participant`.
 
 Notes
 - The function uses rejection sampling to ensure the generated event contains at least one binary collision.
+- After `MAX_COLLISION_ATTEMPTS` consecutive attempts without a collision an error is raised; with the default
+  impact-parameter range this cannot happen by chance (the per-attempt success probability is of order 0.1–1).
 
 Example
 ```julia
@@ -393,15 +407,21 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
 
     R1 = nucleos.nucl1.R
     R2 = nucleos.nucl2.R
-    n1 = rand(rng, nucleos.nucl1)
-    n2 = rand(rng, nucleos.nucl2)
-    θ_b = rand(rng, nucleos.inpact_parameter_angle)
-    s_th, c_th = sincos(θ_b)
     re1 = Vector{SVector{2, eltype(nucleos.nucl1)}}()
     re2 = Vector{SVector{2, eltype(nucleos.nucl2)}}()
     b2_cutoff = nucleos.b2_cutoff
+    attempts = 0
 
     while true
+        attempts += 1
+        if attempts > MAX_COLLISION_ATTEMPTS
+            bmin, bmax = extrema(nucleos.inpact_parameter_magitude)
+            error("no binary collision found in $MAX_COLLISION_ATTEMPTS attempts: the impact-parameter range ($bmin, $bmax) fm has (almost) no collision support for these nuclei and nucleon width $(nucleos.sub_nucleon_width) fm")
+        end
+        n1 = rand(rng, nucleos.nucl1)
+        n2 = rand(rng, nucleos.nucl2)
+        θ_b = rand(rng, nucleos.inpact_parameter_angle)
+        s_th, c_th = sincos(θ_b)
         b = rand(rng, nucleos.inpact_parameter_magitude)
         b_vec = SVector{2}(b * c_th / 2, b * s_th / 2)
         ncoll = 0

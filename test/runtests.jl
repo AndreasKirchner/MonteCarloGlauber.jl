@@ -180,6 +180,28 @@ using Test
         @test all(e.n_coll > 0 for e in evts)
     end
 
+    @testset "Sparse geometries and impact-parameter ranges without collision support" begin
+        # Two single-nucleon "nuclei" spread over R = 6 fm: for ~40% of drawn geometries the pair's
+        # separation perpendicular to the b direction exceeds the collision range, so retrying only b
+        # can never produce a collision. The full geometry must be resampled instead.
+        single = NucleiWoodSaxon3D(1, 0.5, 6.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        sparse = Participants(single, single, 0.5, 2760.0, 1.0, 0.0; Nr = 8, Nth = 8)
+        evts = [rand(rng, sparse) for _ in 1:50]
+        @test all(e.n_coll >= 1 for e in evts)
+        @test all(length(e.part1) == 1 && length(e.part2) == 1 for e in evts)
+
+        # a range entirely beyond the collision support is rejected at construction
+        bmax = maximum(sparse.inpact_parameter_magitude)
+        @test_throws ArgumentError Participants(single, single, 0.5, 2760.0, 1.0, 0.0, (bmax + 1.0, bmax + 2.0))
+        @test_throws ArgumentError Participants(single, single, 0.5, 2760.0, 1.0, 0.0, (2.0, 1.0))
+
+        # a range inside the nominal support but with vanishing collision probability gives up with an error
+        tight = NucleiWoodSaxon3D(1, 0.05, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        support = 2 * MonteCarloGlauber.nuclear_extent(tight) + sqrt(sparse.b2_cutoff)
+        hopeless = Participants(tight, tight, 0.5, 2760.0, 1.0, 0.0, (support - 0.05, support); Nr = 8, Nth = 8)
+        @test_throws ErrorException rand(rng, hopeless)
+    end
+
     @testset "Light ion tabulated events" begin
         oxygen = Oxygen()
         neon = Neon()
