@@ -75,6 +75,30 @@ using Test
         @test_throws ArgumentError MonteCarloGlauber.RejectionSampler((x) -> 1.0, (), (1.0,), 0.0)
     end
 
+    @testset "Deformed density: trig-free evaluation matches the spherical-harmonic formula" begin
+        # reference implementation with explicit angles, as written before the optimisation
+        function reference(x, y, z, α, R, ρ₀, w, beta2, beta3, beta4, gamma)
+            r = hypot(x, y, z)
+            theta = acos(z / r)
+            phi = sign(y) * acos(x / hypot(x, y))
+            ctheta = cos(theta)
+            Y20 = sqrt(5) / 4 * 1 / sqrt(pi) * (3 * ctheta^2 - 1)
+            Y22 = sqrt(15 / 32) * 1 / sqrt(pi) * (1 - ctheta^2) * cos(2 * phi)
+            Y30 = 1 / 4 * sqrt(7 / pi) * (5 * ctheta^3 - 3 * ctheta)
+            Y40 = 3 / 16 * 1 / sqrt(pi) * (35 * ctheta^4 - 30 * ctheta^2 + 3)
+            Reff = R * (1 + beta2 * (cos(gamma) * Y20 + sqrt(2) * sin(gamma) * Y22) + beta3 * Y30 + beta4 * Y40)
+            return ρ₀ * (1 + w * (r / Reff)^2) / (1 + exp((r - Reff) / α))
+        end
+        pars = (0.6, 6.81, 1.0, 0.1, 0.28, 0.093, 0.05, 0.3)   # all deformations and triaxiality non-zero
+        trng = MersenneTwister(7)
+        for _ in 1:200
+            x, y, z = 20 .* (rand(trng, 3) .- 0.5)
+            @test MonteCarloGlauber.density_WS_deformed(x, y, z, pars...) ≈ reference(x, y, z, pars...) rtol = 1.0e-12
+        end
+        u = Uranium()
+        @test u.sampler.target_probability === MonteCarloGlauber.density_WS_deformed_coeff
+    end
+
     @testset "IntegratedWoodSaxon basics" begin
         bb = IntegratedWoodSaxon(4, 0.6, 5.0, 1.0, 0.0, true, 1.0e-3, rng, 10)
         @test size(bb) == (4, 2)

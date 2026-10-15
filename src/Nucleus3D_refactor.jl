@@ -58,26 +58,48 @@ Returns
 - Scalar density value ρ(x,y,z) = ρ₀ (1 + w (r/Reff)^2) / (1 + exp((r - Reff)/α)).
 """
 function density_WS_deformed(x, y, z, α, R, ρ₀, w, beta2, beta3, beta4, gamma)
-    #spherical coordinates
+    return density_WS_deformed_coeff(x, y, z, α, R, ρ₀, w, deformation_coefficients(beta2, beta3, beta4, gamma)...)
+end
+
+"""
+    deformation_coefficients(beta2, beta3, beta4, gamma)
+
+Fold the deformation parameters and the spherical-harmonic normalisations into four
+coefficients `(c20, c22, c30, c40)` such that
+
+Reff(θ,φ) = R * (1 + c20 (3cos²θ − 1) + c22 (1 − cos²θ) cos2φ + c30 (5cos³θ − 3cosθ) + c40 (35cos⁴θ − 30cos²θ + 3)).
+
+Computed once per nucleus so the density evaluation needs no trigonometric calls.
+"""
+function deformation_coefficients(beta2, beta3, beta4, gamma)
+    c20 = beta2 * cos(gamma) * sqrt(5 / pi) / 4
+    c22 = beta2 * sqrt(2) * sin(gamma) * sqrt(15 / (32 * pi))
+    c30 = beta3 * sqrt(7 / pi) / 4
+    c40 = beta4 * 3 / (16 * sqrt(pi))
+    return (c20, c22, c30, c40)
+end
+
+"""
+    density_WS_deformed_coeff(x, y, z, α, R, ρ₀, w, c20, c22, c30, c40)
+
+Trig-free evaluation of the deformed Woods–Saxon density using the coefficients from
+`deformation_coefficients`. Uses `cosθ = z/r` and `cos2φ = (x² − y²)/(x² + y²)` directly.
+This is the target function of the internal rejection sampler.
+"""
+@inline function density_WS_deformed_coeff(x, y, z, α, R, ρ₀, w, c20, c22, c30, c40)
     r = hypot(x, y, z)
 
-    # spherical nucleus: Reff == R, skip the angular part (saves acos + 4 cos per evaluation)
-    if iszero(beta2) && iszero(beta3) && iszero(beta4)
+    # spherical nucleus: Reff == R, skip the angular part
+    if iszero(c20) && iszero(c22) && iszero(c30) && iszero(c40)
         return ρ₀ * (1 + w * (r / R)^2) / (1 + exp((r - R) / α))
     end
 
-    theta = acos(z / r)
-    phi = sign(y) * acos(x / hypot(x, y))
+    ρ2 = x^2 + y^2
+    c = r > 0 ? z / r : one(r)            # cosθ
+    c2 = c^2
+    cos2φ = ρ2 > 0 ? (x^2 - y^2) / ρ2 : one(ρ2)
 
-    #define often used functions
-    ctheta = cos(theta)
-    #define spherical harmonics
-    Y20 = sqrt(5) / 4 * 1 / sqrt(pi) * (3 * ctheta^2 - 1)
-    Y22 = sqrt(15 / 32) * 1 / sqrt(pi) * (1 - ctheta^2) * cos(2 * phi)
-    Y30 = 1 / 4 * sqrt(7 / pi) * (5 * ctheta^3 - 3 * ctheta)
-    Y40 = 3 / 16 * 1 / sqrt(pi) * (35 * ctheta^4 - 30 * ctheta^2 + 3)
-
-    Reff = R * (1 + beta2 * (cos(gamma) * Y20 + sqrt(2) * sin(gamma) * Y22) + beta3 * Y30 + beta4 * Y40)
+    Reff = R * (1 + c20 * (3 * c2 - 1) + c22 * (1 - c2) * cos2φ + c30 * (5 * c2 * c - 3 * c) + c40 * (35 * c2^2 - 30 * c2 + 3))
 
     return ρ₀ * (1 + w * (r / Reff)^2) / (1 + exp((r - Reff) / α))
 end
@@ -123,17 +145,17 @@ Arguments
 - `dmin` — minimum inter-nucleon separation (stored on the object; not applied here by the constructor).
 
 Behavior
-- Constructs a `RejectionSampler` targeting `density_WS_deformed` on a box that contains the nucleus, and returns a fully configured `NucleiWoodSaxon3D` instance ready for sampling via `rand`.
+- Constructs a `RejectionSampler` targeting `density_WS_deformed_coeff` on a box that contains the nucleus, and returns a fully configured `NucleiWoodSaxon3D` instance ready for sampling via `rand`.
 """
 function NucleiWoodSaxon3D(rng::AbstractRNG, N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma, burning_time, dmin)
 
     # box large enough to contain the deformed surface plus a 10α tail (ρ/ρ₀ ≈ e^-10 at the edge)
     L = float(R * (1 + abs(beta2) + abs(beta3) + abs(beta4)) + 10 * α)
 
-    params = (α, R, ρ₀, w, beta2, beta3, beta4, gamma)
+    params = (α, R, ρ₀, w, deformation_coefficients(beta2, beta3, beta4, gamma)...)
 
     bound = density_WS_deformed_bound(L, α, R, ρ₀, w, beta2, beta3, beta4, gamma)
-    sampler = RejectionSampler(density_WS_deformed, params, (L, L, L), bound)
+    sampler = RejectionSampler(density_WS_deformed_coeff, params, (L, L, L), bound)
 
     return NucleiWoodSaxon3D(N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma, burning_time, sampler, dmin)
 
