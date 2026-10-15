@@ -9,11 +9,11 @@ Fields
 - `R::R` — nuclear radius scale.
 - `ρ₀::C` — central density normalization.
 - `w::W` — surface diffuseness parameter.
-- `burning_time::B` — number of burn-in (warmup) steps for the internal Metropolis–Hastings sampler.
+- `burning_time::B` — unused, kept for backward compatibility.
 - `retol::Float64` — relative tolerance passed to the numerical quadrature used when building the interpolant.
 - `npoint::Int` — number of grid points per axis used to compute the interpolant.
 - `interpolation::Inte` — scaled B-spline interpolant (2D) approximating the integrated density used as a target for sampling.
-- `sampler::samp` — sampler object (typically `Metropolis_Hastings`) used to produce correlated samples.
+- `sampler::samp` — `RejectionSampler` used to produce independent samples.
 - `rotated::Bool` — if `true`, each sampled configuration is rotated by a random 2×2 rotation matrix before being returned.
 
 Notes
@@ -53,17 +53,17 @@ Arguments
 - `R` — nuclear radius scale (used also to set grid extent and proposal width).
 - `ρ₀` — central density normalization.
 - `w` — surface diffuseness parameter.
-- `burning_time::Integer` — number of burn-in (warmup) iterations for the Metropolis–Hastings sampler.
+- `burning_time::Integer` — unused, kept for backward compatibility.
 - `retol::Float64` — relative tolerance for the numerical quadrature (`integrate_charge`).
 - `Npoint::Integer` — number of grid points per axis used to evaluate the integrated density.
-- `rng::AbstractRNG` (optional) — RNG used to seed the internal sampler (default `Random.default_rng()`).
+- `rng::AbstractRNG` (optional) — unused, kept for backward compatibility.
 - `rotated::Bool` (optional) — if `true`, produced configurations are randomly rotated before being returned.
 
 This function:
 1. builds a square grid spanning ±3R in each axis,
 2. evaluates the integrated density at each grid point using `integrate_charge`,
 3. constructs a cubic B-spline interpolant and scales it to the physical grid,
-4. creates a `Metropolis_Hastings` sampler using the interpolant and returns the fully populated `IntegratedWoodSaxonInterp`.
+4. creates a `RejectionSampler` using the interpolant and returns the fully populated `IntegratedWoodSaxonInterp`.
 
 Returns
 - `IntegratedWoodSaxonInterp` instance ready to produce (N_nucleon, 2) samples via `rand`.
@@ -80,10 +80,11 @@ function IntegratedWoodSaxonInterp(N_nucleon, α, R, ρ₀, w, burning_time, ret
 
     sitp = Interpolations.scale(itp, A_x1, A_x2)
 
-    draw = (truncated(Normal(0, R), -3R, 3R), truncated(Normal(0, R), -3R, 3R))
+    # stay inside the interpolation grid (±3R)
+    L = float(min(3R, R + 10 * α))
 
     params = ()
-    sampler = Metropolis_Hastings(rng, sitp, params, draw, burning_time)
+    sampler = RejectionSampler(sitp, params, (L, L))
 
     return IntegratedWoodSaxonInterp(N_nucleon, α, R, ρ₀, w, burning_time, retol, Npoint, sitp, sampler, rotated)
 
@@ -99,7 +100,7 @@ Defaults
 - `retol = 1.0e-3`
 - `Npoint = 100`
 
-Use this lightweight constructor for typical usage; it delegates to the full constructor which builds the interpolant and the Metropolis–Hastings sampler. Sample configurations with `rand` (or `Distributions._rand!`) to obtain an `(N_nucleon, 2)` matrix of positions.
+Use this lightweight constructor for typical usage; it delegates to the full constructor which builds the interpolant and the rejection sampler. Sample configurations with `rand` (or `Distributions._rand!`) to obtain an `(N_nucleon, 2)` matrix of positions.
 """
 function IntegratedWoodSaxonInterp(N_nucleon, α, R, ρ₀, w, rng = Random.default_rng(), rotated = true)
     burning_time = 1000
@@ -119,7 +120,7 @@ end
 Fill the provided matrix `x` with a single sample from the integrated Wood–Saxon distribution stored in `s`.
 
 Behavior
-- Samples are produced by drawing positions from `s.sampler` (a `Metropolis_Hastings` sampler) using `rand(rng, s.sampler)`.
+- Samples are produced by drawing positions from `s.sampler` (a `RejectionSampler`) using `rand(rng, s.sampler)`.
 - If `s.rotated` is `true` a random 2×2 rotation (`RotMatrix{2}`) is sampled and applied to each nucleon position before writing into `x`.
 - The function writes directly into `x` and returns it. The expected shape of `x` is `(s.N_nucleon, 2)`.
 

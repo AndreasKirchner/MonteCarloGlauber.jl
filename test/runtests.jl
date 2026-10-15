@@ -1,6 +1,8 @@
 using MonteCarloGlauber
 using Random
 using StaticArrays
+using Statistics
+using QuadGK
 using Test
 
 @testset "MonteCarloGlauber.jl" begin
@@ -14,6 +16,31 @@ using Test
         sample = rand(rng, aa)
         @test size(sample) == (4, 2)
         @test eltype(sample) == Float64
+    end
+
+    @testset "Woods-Saxon radial density is sampled exactly" begin
+        # Lead: R = 6.65, α = 0.54. Compare the sampled radial histogram with the analytic
+        # Woods-Saxon profile shell by shell, and the mean radius. The previous Metropolis
+        # sampler failed this test by ~10σ in the inner shells.
+        R, α = 6.65, 0.54
+        ρ(r) = 1 / (1 + exp((r - R) / α))
+        Z = quadgk(r -> r^2 * ρ(r), 0, 30)[1]
+        n = Lead()
+        rng = MersenneTwister(42)
+        N = 100_000
+        rs = [hypot(rand(rng, n.sampler)...) for _ in 1:N]
+        for lo in 0.0:1.0:9.0
+            expected = N * quadgk(r -> r^2 * ρ(r), lo, lo + 1)[1] / Z
+            observed = count(r -> lo <= r < lo + 1, rs)
+            @test abs(observed - expected) < 4 * sqrt(expected)
+        end
+        mean_r_exact = quadgk(r -> r^3 * ρ(r), 0, 30)[1] / Z
+        @test abs(mean(rs) - mean_r_exact) < 0.02
+        # projected (2D) samplers: ⟨x²+y²⟩ = (2/3)⟨r²⟩
+        r2_exact = quadgk(r -> r^4 * ρ(r), 0, 30)[1] / Z
+        itp = IntegratedWoodSaxonInterp(208, α, R, 1.0, 0.0, 10, 1.0e-3, 100, rng, true)
+        r2_2d = mean(sum(abs2, rand(rng, itp.sampler)) for _ in 1:N)
+        @test abs(r2_2d / (2 / 3 * r2_exact) - 1) < 0.02
     end
 
     @testset "IntegratedWoodSaxon basics" begin

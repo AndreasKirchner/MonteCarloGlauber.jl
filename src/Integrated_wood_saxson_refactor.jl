@@ -10,8 +10,8 @@ Fields
 - `ρ₀::C` — central density normalization.
 - `w::W` — optional quadratic deformation coefficient that modulates the radial profile.
 - `retol::Float64` — relative tolerance passed to the quadrature used when building the projected density.
-- `burning_time::Int64` — number of burn-in (warmup) iterations used by the internal `Metropolis_Hastings` sampler.
-- `sampler::samp` — sampler object (typically `Metropolis_Hastings`) that draws correlated 2D positions from the projected density.
+- `burning_time::Int64` — unused, kept for backward compatibility.
+- `sampler::samp` — `RejectionSampler` that draws independent 2D positions from the projected density.
 - `rotated::Bool` — when `true`, each sampled configuration is post-multiplied by a random `RotMatrix{2}` so the orientation is randomized.
 
 Notes
@@ -87,18 +87,18 @@ end
 
 Construct an `IntegratedWoodSaxon` sampler which draws `N_nucleon` transverse positions per sample by Monte Carlo from the projected
 (2D) Woods–Saxon density. The projected density is obtained by integrating the 3D Woods–Saxon profile along the longitudinal axis
-using `quadgk`, and the resulting function is used as the target for a `Metropolis_Hastings` sampler.
+using `quadgk`, and the resulting function is used as the target for a `RejectionSampler`.
 
 Arguments
 - `N_nucleon::Int` — number of nucleons per draw (sample shape `(N_nucleon,2)`).
 - `α, R, ρ₀, w` — density parameters passed to `density_WS` and `integrate_charge`.
 - `rotated::Bool` (default `true`) — if `true` apply a random 2×2 rotation to each configuration to randomize orientation.
 - `retol::Float64` (default `1e-3`) — relative tolerance passed to `quadgk` during projection.
-- `rng::AbstractRNG` — RNG used to seed the internal `Metropolis_Hastings` sampler.
-- `burning_time::Int` — number of burn-in iterations for the internal sampler.
+- `rng::AbstractRNG` — unused, kept for backward compatibility.
+- `burning_time::Int` — unused, kept for backward compatibility.
 
 Notes
-- This constructor builds a `Metropolis_Hastings` sampler with `integrate_charge` as the target and returns a fully configured
+- This constructor builds a `RejectionSampler` with `integrate_charge` as the target and returns a fully configured
   `IntegratedWoodSaxon{typeof(α), typeof(R), typeof(ρ₀), typeof(w), typeof(sampler)}` ready for sampling with `rand`.
 """
 function IntegratedWoodSaxon(
@@ -109,10 +109,10 @@ function IntegratedWoodSaxon(
 
     segbuf = alloc_segbuf(typeof(1.0 * Inf), promote_type(typeof(α), typeof(R), typeof(ρ₀), typeof(w)), promote_type(typeof(α), typeof(R), typeof(ρ₀), typeof(w)))
 
-    draw = (Normal(0, R), Normal(0, R))
+    L = float(R + 10 * α)
     params = (α, R, ρ₀, w, retol, segbuf)
 
-    sampler = Metropolis_Hastings(rng, integrate_charge, params, draw, burning_time)
+    sampler = RejectionSampler(integrate_charge, params, (L, L))
 
     return IntegratedWoodSaxon{typeof(α), typeof(R), typeof(ρ₀), typeof(w), typeof(sampler)}(N_nucleon, α, R, ρ₀, w, retol, burning_time, sampler, rotated)
 end
@@ -123,7 +123,7 @@ end
 Return a lightweight copy of `s` with a fresh internal sampler state.
 
 The returned value is a new `IntegratedWoodSaxon` constructed with the same density parameters and defaults; the internal
-`Metropolis_Hastings` sampler is re-created so the sampler state is independent from the original.
+sampler is stateless, so copies are independent by construction.
 """
 function Base.copy(s::IntegratedWoodSaxon{T, R, C, W, samp}) where {T, R, C, W, samp}
     return IntegratedWoodSaxon(s.N_nucleon, s.α, s.R, s.ρ₀, s.w)
