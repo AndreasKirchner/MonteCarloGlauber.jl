@@ -180,9 +180,8 @@ function NucleiWoodSaxon3D(N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamm
 end
 
 
-function Base.copy(s::NucleiWoodSaxon3D{T, R, C, W, D1, D2, D3, D4, B, samp}) where {T, R, C, W, D1, D2, D3, D4, B, samp}
-    return NucleiWoodSaxon3D(s.N_nucleon, s.α, s.R, s.ρ₀, s.w, s.beta2, s.beta3, s.beta4, s.gamma, s.d_min)
-end
+# immutable and stateless (the rejection sampler holds no mutable state): sharing between threads is safe
+Base.copy(s::NucleiWoodSaxon3D) = s
 
 
 """

@@ -135,10 +135,10 @@ end
 """
     copy(s::IntegratedWoodSaxon)
 
-Return a lightweight copy of `s` with a fresh internal sampler state.
+Return a copy of `s` with its own quadrature workspace.
 
-The returned value is a new `IntegratedWoodSaxon` constructed with the same density parameters and defaults; the internal
-sampler is stateless, so copies are independent by construction.
+The sampler itself is stateless, but `integrate_charge` carries a mutable `quadgk` segment buffer that must not be
+shared between threads, so `Threaded` needs a genuine copy here (built with the same density parameters and defaults).
 """
 function Base.copy(s::IntegratedWoodSaxon{T, R, C, W, samp}) where {T, R, C, W, samp}
     return IntegratedWoodSaxon(s.N_nucleon, s.α, s.R, s.ρ₀, s.w)
@@ -219,8 +219,10 @@ Arguments
 - `elem` — a `Sampleable` object (for example, an `IntegratedWoodSaxon`) which will be replicated into thread-local buffers.
 
 Behavior
-- Creates `2 * nthreads()` thread-local copies by default via `Threaded(elem, 2 * nthreads())`.
-- Each copy has an independent internal sampler state so concurrent calls to `rand` are thread-safe and do not share sampler state.
+- Creates `2 * nthreads()` thread-local copies by default via `Threaded(elem, 2 * nthreads())`. For stateless samplers
+  (`NucleiWoodSaxon3D`, `IntegratedWoodSaxonInterp`, `TabulatedEvent`) `copy` is the identity, so this is free; only
+  `IntegratedWoodSaxon` is really duplicated because it owns a quadrature workspace.
+- Each task draws from its own RNG seeded from the one passed to `rand`, so no RNG is shared between threads.
 - When sampling with `rand(rng, threaded(elem), n)` the total workload is split among the internal buffers and executed in parallel, improving throughput on multi-core machines.
 
 Examples
@@ -244,6 +246,9 @@ Behavior
 - The total work is split roughly evenly across the number of buffers (`ntask = length(s.copy_buff)`).
 - Each buffer produces `div(n, ntask)` samples concurrently via a threaded map/reduce (`tmapreduce`).
 - Any remainder samples are produced by the first buffer and appended.
+- `rng` is never shared between tasks: one `UInt64` seed per task is drawn from `rng` up front and each task
+  samples from its own `Xoshiro(seed)`. This is safe for any `AbstractRNG` (a shared `MersenneTwister` would be
+  corrupted by concurrent use) and makes the result reproducible for a given seeded `rng` regardless of the thread count.
 - Returns a vertically concatenated matrix of shape `(n*s.copy_buff[1].N_nucleon, s.dim)` (or shape `(n, ...)` consistent with the underlying sample shape).
 """
 function Distributions.rand(rng::AbstractRNG, s::Threaded{T, N}, n::Int64) where {T, N}
@@ -252,8 +257,10 @@ function Distributions.rand(rng::AbstractRNG, s::Threaded{T, N}, n::Int64) where
     reminder = n - ntask * chuncks
 
 
-    result = tmapreduce(vcat, s.copy_buff) do elm
-        rand(rng, elm, chuncks)
+    seeds = rand(rng, UInt64, ntask)
+
+    result = tmapreduce(vcat, eachindex(s.copy_buff)) do i
+        rand(Xoshiro(seeds[i]), s.copy_buff[i], chuncks)
     end
 
     if reminder > 0

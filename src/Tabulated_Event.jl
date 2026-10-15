@@ -53,9 +53,8 @@ function TabulatedEvent(filename)
     return TabulatedEvent(N_nucleon, N_configs, radius, filename, array, true)
 end
 
-function drawIndeces(nevents, s::TabulatedEvent{B}) where {B}
-    return rand(1:s.N_configs, nevents)
-end
+drawIndeces(rng::AbstractRNG, nevents, s::TabulatedEvent) = rand(rng, 1:s.N_configs, nevents)
+drawIndeces(nevents, s::TabulatedEvent) = drawIndeces(Random.default_rng(), nevents, s)
 
 
 Base.size(s::TabulatedEvent{B}) where {B} = (s.N_nucleon, 2)
@@ -68,9 +67,10 @@ Fill the provided matrix `x` in-place with a single sampled configuration from
 `s`.
 
 Behavior
-- Selects a random configuration index, samples a random 3×3 rotation matrix,
-  applies the rotation to the 3×N config array, and writes the first two
-  components of each rotated nucleon into the rows of `x`.
+- Selects a random configuration index with `rng`, samples a random 3×3 rotation
+  matrix with `rng` (identity if `s.rotated == false`), applies it to the 3×N
+  config array once, and writes the first two components of each rotated nucleon
+  into the rows of `x`.
 - The expected shape of `x` is `(s.N_nucleon, 2)` and the function returns
   the mutated `x`.
 
@@ -79,15 +79,11 @@ Notes
   primitive and is used internally by `Distributions.rand`/`rand`.
 """
 function Distributions._rand!(rng::AbstractRNG, s::TabulatedEvent{B}, x::DenseMatrix{<:Real}) where {B}
-    index = drawIndeces(1, s)[1]
-    rotmatrix = rand(rng, RotMatrix{3})
-    config = s.array[:, :, index]
-    for i in Base.axes(x, 1)
-        rot = rotmatrix * config
-        for j in Base.axes(x, 2)
-            x[i, j] = rot[j, i]
-        end
-
+    index = rand(rng, 1:s.N_configs)
+    config = @view s.array[:, :, index]
+    rot = s.rotated ? rand(rng, RotMatrix{3}) * config : config
+    @inbounds for i in Base.axes(x, 1), j in Base.axes(x, 2)
+        x[i, j] = rot[j, i]
     end
     return x
 end
@@ -104,9 +100,8 @@ function Distributions.rand(s::TabulatedEvent{B}) where {B}
     return Distributions.rand(Random.default_rng(), s)
 end
 
-function Base.copy(s::TabulatedEvent{B}) where {B}
-    return TabulatedEvent(s.N_nucleon, s.N_configs, s.R, s.name, copy(s.array), s.rotated)
-end
+# the configuration table is read-only: sharing between threads is safe, no need to duplicate it
+Base.copy(s::TabulatedEvent) = s
 
 # largest nucleon radius over all tabulated configurations (see `nuclear_extent`)
 nuclear_extent(n::TabulatedEvent) = maximum(hypot(c...) for c in eachcol(reshape(n.array, 3, :)))

@@ -112,9 +112,8 @@ function IntegratedWoodSaxonInterp(N_nucleon, α, R, ρ₀, w, rng = Random.defa
     return IntegratedWoodSaxonInterp(N_nucleon, α, R, ρ₀, w, burning_time, retol, Npoint, rng, rotated)
 end
 
-function Base.copy(s::IntegratedWoodSaxonInterp{T, R, C, W, B, Inte, samp}) where {T, R, C, W, B, Inte, samp}
-    return IntegratedWoodSaxonInterp(s.N_nucleon, s.α, s.R, s.ρ₀, s.w)
-end
+# immutable and stateless (interpolant and rejection sampler are read-only): sharing between threads is safe
+Base.copy(s::IntegratedWoodSaxonInterp) = s
 
 
 """

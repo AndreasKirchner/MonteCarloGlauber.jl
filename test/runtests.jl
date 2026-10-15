@@ -202,6 +202,26 @@ using Test
         @test_throws ErrorException rand(rng, hopeless)
     end
 
+    @testset "Threaded sampling: no RNG sharing, reproducible, cheap copies" begin
+        n1 = NucleiWoodSaxon3D(rng, 8, 0.6, 5.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10, 0.0)
+        participants = Participants(n1, n1, 0.5, 200.0, 1.0, 0.0; Nr = 8, Nth = 8)
+        tp = threaded(participants)
+        # an explicit (non task-local) RNG must neither error nor be shared between tasks
+        a = [e.b for e in rand(MersenneTwister(11), tp, 40)]
+        b = [e.b for e in rand(MersenneTwister(11), tp, 40)]
+        @test a == b
+        @test length(a) == 40
+        # stateless samplers are shared, not duplicated
+        @test tp.copy_buff[1].nucl1 === participants.nucl1
+        o = Oxygen()
+        @test copy(o) === o
+        @test threaded(Participants(o, o, 0.5, 200.0, 1.0, 0.0; Nr = 8, Nth = 8)).copy_buff[1].nucl1.array === o.array
+        # IntegratedWoodSaxon owns a quadrature workspace and must still be duplicated
+        iws = IntegratedWoodSaxon(4, 0.6, 5.0, 1.0, 0.0, true, 1.0e-3, rng, 10)
+        @test copy(iws) !== iws
+        @test copy(iws).sampler.params[end] !== iws.sampler.params[end]
+    end
+
     @testset "Light ion tabulated events" begin
         oxygen = Oxygen()
         neon = Neon()
@@ -217,6 +237,10 @@ using Test
         @test size(oxygen) == (oxygen.N_nucleon, 2)
         @test size(neon) == (neon.N_nucleon, 2)
 
+        # the RNG passed in is the one used: same seed, same configuration and orientation
+        @test rand(MersenneTwister(3), oxygen) == rand(MersenneTwister(3), oxygen)
+        @test rand(MersenneTwister(3), neon) == rand(MersenneTwister(3), neon)
+        @test rand(MersenneTwister(3), oxygen) != rand(MersenneTwister(4), oxygen)
         sample_o = rand(rng, oxygen)
         sample_n = rand(rng, neon)
         @test size(sample_o) == (oxygen.N_nucleon, 2)
