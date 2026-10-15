@@ -84,7 +84,10 @@ function IntegratedWoodSaxonInterp(N_nucleon, α, R, ρ₀, w, burning_time, ret
     L = float(min(3R, R + 10 * α))
 
     params = ()
-    sampler = RejectionSampler(sitp, params, (L, L))
+    # analytic bound of the exact projected density, plus 2% for interpolation overshoot
+    # (violations are detected and raise an error in `rand`)
+    bound = 1.02 * integrated_density_bound(L, α, R, ρ₀, w)
+    sampler = RejectionSampler(sitp, params, (L, L), bound)
 
     return IntegratedWoodSaxonInterp(N_nucleon, α, R, ρ₀, w, burning_time, retol, Npoint, sitp, sampler, rotated)
 

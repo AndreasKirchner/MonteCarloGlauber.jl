@@ -43,6 +43,38 @@ using Test
         @test abs(r2_2d / (2 / 3 * r2_exact) - 1) < 0.02
     end
 
+    @testset "Rejection sampler envelope is a guaranteed bound" begin
+        # Regression: a very diffuse profile (α = R) whose peak a coarse grid scan missed.
+        n = NucleiWoodSaxon3D(10, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        @test n.sampler.bound >= 1 / (1 + exp(-1.0))              # true maximum of ρ
+        ρ(r) = 1 / (1 + exp(r - 1))
+        Z = quadgk(r -> r^2 * ρ(r), 0, 40)[1]
+        trng = MersenneTwister(5)
+        rs = [hypot(rand(trng, n.sampler)...) for _ in 1:200_000]
+        @test abs(mean(rs) - quadgk(r -> r^3 * ρ(r), 0, 40)[1] / Z) < 0.012
+        p_core = quadgk(r -> r^2 * ρ(r), 0, 0.5)[1] / Z
+        @test abs(mean(rs .< 0.5) - p_core) < 3.5 * sqrt(p_core / length(rs))
+
+        # bound ≥ target at random points in the box, for deformed, modulated and projected targets
+        for nuc in (
+                Uranium(),
+                NucleiWoodSaxon3D(10, 0.5, 5.0, 2.0, 0.3, 0.2, 0.1, 0.1, 0.4),     # w > 0, triaxial
+                IntegratedWoodSaxon(10, 0.6, 5.0, 1.0, 0.2, true, 1.0e-4, trng, 10),
+                IntegratedWoodSaxonInterp(10, 0.6, 5.0, 1.0, 0.2, 10, 1.0e-4, 60, trng, true),
+            )
+            s = nuc.sampler
+            for _ in 1:500
+                x = ntuple(i -> (2 * rand(trng) - 1) * s.half_width[i], length(s.half_width))
+                @test s.target_probability(x..., s.params...) <= s.bound
+            end
+        end
+
+        # an envelope violation is reported, not silently clipped
+        bad = MonteCarloGlauber.RejectionSampler((x) -> 2.0, (), (1.0,), 1.0)
+        @test_throws ErrorException rand(trng, bad)
+        @test_throws ArgumentError MonteCarloGlauber.RejectionSampler((x) -> 1.0, (), (1.0,), 0.0)
+    end
+
     @testset "IntegratedWoodSaxon basics" begin
         bb = IntegratedWoodSaxon(4, 0.6, 5.0, 1.0, 0.0, true, 1.0e-3, rng, 10)
         @test size(bb) == (4, 2)

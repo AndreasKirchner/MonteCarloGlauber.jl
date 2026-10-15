@@ -83,6 +83,24 @@ function density_WS_deformed(x, y, z, α, R, ρ₀, w, beta2, beta3, beta4, gamm
 end
 
 
+"""
+    density_WS_deformed_bound(L, α, R, ρ₀, w, beta2, beta3, beta4, gamma)
+
+Guaranteed upper bound of `density_WS_deformed` on the cube `[-L, L]³`.
+
+The Fermi factor is at most 1, and `Reff ≥ R_min = R (1 − |β₂|(|cosγ| max Y₂₀ + √2 |sinγ| max|Y₂₂|) − |β₃| max Y₃₀ − |β₄| max Y₄₀)`,
+so `ρ ≤ ρ₀ (1 + max(w, 0) · 3L² / R_min²)`. For `w = 0` (all built-in nuclei) this is simply `ρ₀`.
+"""
+function density_WS_deformed_bound(L, α, R, ρ₀, w, beta2, beta3, beta4, gamma)
+    maxY20 = sqrt(5 / (4 * pi))          # at θ = 0
+    maxY22 = sqrt(15 / (32 * pi))        # at θ = π/2, φ = 0
+    maxY30 = sqrt(7 / (4 * pi))          # at θ = 0
+    maxY40 = 3 / (2 * sqrt(pi))          # at θ = 0
+    Rmin = R * (1 - abs(beta2) * (abs(cos(gamma)) * maxY20 + sqrt(2) * abs(sin(gamma)) * maxY22) - abs(beta3) * maxY30 - abs(beta4) * maxY40)
+    Rmin > 0 || throw(ArgumentError("deformation too large: effective radius can reach zero (R_min = $Rmin)"))
+    return ρ₀ * (1 + max(w, zero(w)) * 3 * L^2 / Rmin^2)
+end
+
 dimension(::NucleiWoodSaxon3D{T, R, C, W, D1, D2, D3, D4, B, samp}) where {T, R, C, W, D1, D2, D3, D4, B, samp} = 2
 nucleon(s::NucleiWoodSaxon3D{T, R, C, W, D1, D2, D3, D4, B, samp}) where {T, R, C, W, D1, D2, D3, D4, B, samp} = s.N_nucleon
 
@@ -114,7 +132,8 @@ function NucleiWoodSaxon3D(rng::AbstractRNG, N_nucleon, α, R, ρ₀, w, beta2, 
 
     params = (α, R, ρ₀, w, beta2, beta3, beta4, gamma)
 
-    sampler = RejectionSampler(density_WS_deformed, params, (L, L, L))
+    bound = density_WS_deformed_bound(L, α, R, ρ₀, w, beta2, beta3, beta4, gamma)
+    sampler = RejectionSampler(density_WS_deformed, params, (L, L, L), bound)
 
     return NucleiWoodSaxon3D(N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma, burning_time, sampler, dmin)
 
