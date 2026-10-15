@@ -107,3 +107,6 @@ end
 function Base.copy(s::TabulatedEvent{B}) where {B}
     return TabulatedEvent(s.N_nucleon, s.N_configs, s.R, s.name, copy(s.array), s.rotated)
 end
+
+# largest nucleon radius over all tabulated configurations (see `nuclear_extent`)
+nuclear_extent(n::TabulatedEvent) = maximum(hypot(c...) for c in eachcol(reshape(n.array, 3, :)))

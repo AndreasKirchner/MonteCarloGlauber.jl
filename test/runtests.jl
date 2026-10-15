@@ -137,6 +137,25 @@ using Test
         @test 0.0 <= event.b <= bmax
     end
 
+    @testset "Pair-loop cutoff and default impact-parameter range" begin
+        w = 0.5
+        n = Lead()
+        participants = Participants(n, n, w, 2760.0, 1.0, 0.0; Nr = 8, Nth = 8)
+        # collision probability at the cutoff distance is at the 1e-7 threshold
+        b2 = participants.b2_cutoff
+        @test MonteCarloGlauber.binary_impact_parameter_probability(b2, participants) ≈ 1.0e-7 rtol = 1.0e-3
+        @test MonteCarloGlauber.binary_impact_parameter_probability(0.0, participants) > 0.9
+        # default b_max covers both nuclei plus the collision range (Pb-Pb: ≈ 26 fm)
+        bmax = maximum(participants.inpact_parameter_magitude)
+        @test 2 * n.R + sqrt(b2) < bmax < 3 * (2 * n.R)
+        @test MonteCarloGlauber.nuclear_extent(Oxygen()) > 0
+        @test MonteCarloGlauber.nuclear_extent(n) ≈ n.R + 8 * n.α
+        # sampled events stay inside the range and have at least one collision
+        evts = [rand(rng, participants) for _ in 1:20]
+        @test all(0.0 <= e.b <= bmax for e in evts)
+        @test all(e.n_coll > 0 for e in evts)
+    end
+
     @testset "Light ion tabulated events" begin
         oxygen = Oxygen()
         neon = Neon()
