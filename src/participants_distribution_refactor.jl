@@ -315,8 +315,10 @@ end
 @inline @fastmath function binary_impact_parameter_probability(b2, nucleos::Participants{A, B, C, D, E, F, G, H, L}) where {A, B, C, D, E, F, G, H, L}
     w = nucleos.sub_nucleon_width
     gasussd = 1 / (4 * w^2)
-    Tnn = gasussd * Base.Math.exp_fast(-b2 * gasussd) / pi
-    return one(Tnn) - Base.Math.exp_fast(-nucleos.sigma_gg * Tnn)
+    #Tnn = gasussd * Base.Math.exp_fast(-b2 * gasussd) / pi
+    Tnn = gasussd * exp(-b2 * gasussd) / pi
+    #return one(Tnn) - Base.Math.exp_fast(-nucleos.sigma_gg * Tnn)
+    return one(Tnn) - exp(-nucleos.sigma_gg * Tnn)
 
 end
 
