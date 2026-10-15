@@ -48,6 +48,7 @@ function Random.rand(rng::AbstractRNG, s::RejectionSampler{DIM, T, S, V}) where 
             return x
         end
     end
+    return
 end
 
 Random.rand(s::RejectionSampler) = rand(Random.default_rng(), s)
