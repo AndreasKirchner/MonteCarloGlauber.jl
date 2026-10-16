@@ -75,6 +75,30 @@ using Test
         @test_throws ArgumentError MonteCarloGlauber.RejectionSampler((x) -> 1.0, (), (1.0,), 0.0)
     end
 
+    @testset "Deformed density: trig-free evaluation matches the spherical-harmonic formula" begin
+        # reference implementation with explicit angles, as written before the optimisation
+        function reference(x, y, z, α, R, ρ₀, w, beta2, beta3, beta4, gamma)
+            r = hypot(x, y, z)
+            theta = acos(z / r)
+            phi = sign(y) * acos(x / hypot(x, y))
+            ctheta = cos(theta)
+            Y20 = sqrt(5) / 4 * 1 / sqrt(pi) * (3 * ctheta^2 - 1)
+            Y22 = sqrt(15 / 32) * 1 / sqrt(pi) * (1 - ctheta^2) * cos(2 * phi)
+            Y30 = 1 / 4 * sqrt(7 / pi) * (5 * ctheta^3 - 3 * ctheta)
+            Y40 = 3 / 16 * 1 / sqrt(pi) * (35 * ctheta^4 - 30 * ctheta^2 + 3)
+            Reff = R * (1 + beta2 * (cos(gamma) * Y20 + sqrt(2) * sin(gamma) * Y22) + beta3 * Y30 + beta4 * Y40)
+            return ρ₀ * (1 + w * (r / Reff)^2) / (1 + exp((r - Reff) / α))
+        end
+        pars = (0.6, 6.81, 1.0, 0.1, 0.28, 0.093, 0.05, 0.3)   # all deformations and triaxiality non-zero
+        trng = MersenneTwister(7)
+        for _ in 1:200
+            x, y, z = 20 .* (rand(trng, 3) .- 0.5)
+            @test MonteCarloGlauber.density_WS_deformed(x, y, z, pars...) ≈ reference(x, y, z, pars...) rtol = 1.0e-12
+        end
+        u = Uranium()
+        @test u.sampler.target_probability === MonteCarloGlauber.density_WS_deformed_coeff
+    end
+
     @testset "IntegratedWoodSaxon basics" begin
         bb = IntegratedWoodSaxon(4, 0.6, 5.0, 1.0, 0.0, true, 1.0e-3, rng, 10)
         @test size(bb) == (4, 2)
@@ -137,6 +161,94 @@ using Test
         @test 0.0 <= event.b <= bmax
     end
 
+    @testset "Pair-loop cutoff and default impact-parameter range" begin
+        w = 0.5
+        n = Lead()
+        participants = Participants(n, n, w, 2760.0, 1.0, 0.0; Nr = 8, Nth = 8)
+        # collision probability at the cutoff distance is at the 1e-7 threshold
+        b2 = participants.b2_cutoff
+        @test MonteCarloGlauber.binary_impact_parameter_probability(b2, participants) ≈ 1.0e-7 rtol = 1.0e-3
+        @test MonteCarloGlauber.binary_impact_parameter_probability(0.0, participants) > 0.9
+        # default b_max covers both nuclei plus the collision range (Pb-Pb: ≈ 26 fm)
+        bmax = maximum(participants.inpact_parameter_magitude)
+        @test 2 * n.R + sqrt(b2) < bmax < 3 * (2 * n.R)
+        @test MonteCarloGlauber.nuclear_extent(Oxygen()) > 0
+        @test MonteCarloGlauber.nuclear_extent(n) ≈ n.R + 8 * n.α
+        # sampled events stay inside the range and have at least one collision
+        evts = [rand(rng, participants) for _ in 1:20]
+        @test all(0.0 <= e.b <= bmax for e in evts)
+        @test all(e.n_coll > 0 for e in evts)
+    end
+
+    @testset "Sparse geometries and impact-parameter ranges without collision support" begin
+        # Two single-nucleon "nuclei" spread over R = 6 fm: for ~40% of drawn geometries the pair's
+        # separation perpendicular to the b direction exceeds the collision range, so retrying only b
+        # can never produce a collision. The full geometry must be resampled instead.
+        single = NucleiWoodSaxon3D(1, 0.5, 6.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        sparse = Participants(single, single, 0.5, 2760.0, 1.0, 0.0; Nr = 8, Nth = 8)
+        evts = [rand(rng, sparse) for _ in 1:50]
+        @test all(e.n_coll >= 1 for e in evts)
+        @test all(length(e.part1) == 1 && length(e.part2) == 1 for e in evts)
+
+        # a range entirely beyond the collision support is rejected at construction
+        bmax = maximum(sparse.inpact_parameter_magitude)
+        @test_throws ArgumentError Participants(single, single, 0.5, 2760.0, 1.0, 0.0, (bmax + 1.0, bmax + 2.0))
+        @test_throws ArgumentError Participants(single, single, 0.5, 2760.0, 1.0, 0.0, (2.0, 1.0))
+
+        # a range inside the nominal support but with vanishing collision probability gives up with an error
+        tight = NucleiWoodSaxon3D(1, 0.05, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        support = 2 * MonteCarloGlauber.nuclear_extent(tight) + sqrt(sparse.b2_cutoff)
+        hopeless = Participants(tight, tight, 0.5, 2760.0, 1.0, 0.0, (support - 0.05, support); Nr = 8, Nth = 8)
+        @test_throws ErrorException rand(rng, hopeless)
+    end
+
+    @testset "Threaded sampling: no RNG sharing, reproducible, cheap copies" begin
+        n1 = NucleiWoodSaxon3D(rng, 8, 0.6, 5.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10, 0.0)
+        participants = Participants(n1, n1, 0.5, 200.0, 1.0, 0.0; Nr = 8, Nth = 8)
+        tp = threaded(participants)
+        # an explicit (non task-local) RNG must neither error nor be shared between tasks
+        a = [e.b for e in rand(MersenneTwister(11), tp, 40)]
+        b = [e.b for e in rand(MersenneTwister(11), tp, 40)]
+        @test a == b
+        @test length(a) == 40
+        # stateless samplers are shared, not duplicated
+        @test tp.copy_buff[1].nucl1 === participants.nucl1
+        o = Oxygen()
+        @test copy(o) === o
+        @test threaded(Participants(o, o, 0.5, 200.0, 1.0, 0.0; Nr = 8, Nth = 8)).copy_buff[1].nucl1.array === o.array
+        # IntegratedWoodSaxon owns a quadrature workspace and must still be duplicated
+        iws = IntegratedWoodSaxon(4, 0.6, 5.0, 1.0, 0.0, true, 1.0e-3, rng, 10)
+        @test copy(iws) !== iws
+        @test copy(iws).sampler.params[end] !== iws.sampler.params[end]
+    end
+
+    @testset "rotated keyword" begin
+        # 3D deformed nucleus: unrotated keeps the prolate axis along z, so the projected ⟨x²+y²⟩ is smaller
+        u_rot = Uranium()
+        u_fix = Uranium(rotated = false)
+        @test u_rot.rotated && !u_fix.rotated
+        r2(nuc, n) = mean(sum(abs2, rand(rng, nuc)) / nuc.N_nucleon for _ in 1:n)
+        @test r2(u_fix, 400) < 0.95 * r2(u_rot, 400)
+        # spherical nucleus: rotation is irrelevant for the distribution
+        pb_fix = Lead(rotated = false)
+        @test abs(r2(pb_fix, 400) / r2(Lead(), 400) - 1) < 0.03
+        # 2D samplers: keyword and positional forms agree, both orientations sample
+        a = IntegratedWoodSaxonInterp(4, 0.6, 5.0, 1.0, 0.0; rotated = false, Npoint = 20)
+        b = IntegratedWoodSaxonInterp(4, 0.6, 5.0, 1.0, 0.0, rng, false)
+        @test !a.rotated && !b.rotated && a.npoint == 20
+        @test size(rand(rng, a)) == (4, 2)
+        c = IntegratedWoodSaxon(4, 0.6, 5.0, 1.0, 0.0; rotated = false, retol = 1.0e-2)
+        d = IntegratedWoodSaxon(4, 0.6, 5.0, 1.0, 0.0, false, 1.0e-2)
+        @test !c.rotated && !d.rotated && c.retol == 1.0e-2
+        @test size(rand(rng, c)) == (4, 2)
+        # tabulated: unrotated samples are rows of the stored table
+        o_fix = Oxygen(rotated = false)
+        @test !o_fix.rotated
+        s = rand(rng, o_fix)
+        table_xy = Set(Tuple(c[1:2]) for c in eachcol(reshape(o_fix.array, 3, :)))
+        @test all(Tuple(s[i, :]) in table_xy for i in 1:size(s, 1))
+    end
+
     @testset "Light ion tabulated events" begin
         oxygen = Oxygen()
         neon = Neon()
@@ -152,6 +264,10 @@ using Test
         @test size(oxygen) == (oxygen.N_nucleon, 2)
         @test size(neon) == (neon.N_nucleon, 2)
 
+        # the RNG passed in is the one used: same seed, same configuration and orientation
+        @test rand(MersenneTwister(3), oxygen) == rand(MersenneTwister(3), oxygen)
+        @test rand(MersenneTwister(3), neon) == rand(MersenneTwister(3), neon)
+        @test rand(MersenneTwister(3), oxygen) != rand(MersenneTwister(4), oxygen)
         sample_o = rand(rng, oxygen)
         sample_n = rand(rng, neon)
         @test size(sample_o) == (oxygen.N_nucleon, 2)

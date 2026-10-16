@@ -214,6 +214,7 @@ Fields
 - `sigma_gg` — per‑gluon (partonic) cross section used in computing binary collision probabilities.
 - `shape_parameter` — Gamma distribution shape parameter used to sample per‑participant fluctuation weights.
 - `total_cross_section` — inelastic nucleon‑nucleon cross section at the chosen energy (σ_NN).
+- `b2_cutoff` — squared nucleon–nucleon distance beyond which the collision probability is below `1e-7`; such pairs are skipped in the sampling loop.
 - `p` — exponent used when combining thickness functions (p‑mean: `p = 0` implies geometric mean).
 - `accumulation_preparation` — precomputed data used to accelerate center‑of‑mass and accumulation calculations.
 
@@ -229,6 +230,7 @@ struct Participants{A, B, C, D, E, F, G, H, L} <: Sampleable{Univariate, Partici
     sigma_gg::E
     shape_parameter::F
     total_cross_section::Float64
+    b2_cutoff::Float64
     p::L
     accumulation_preparation::H
 end
@@ -245,7 +247,10 @@ Constructor for the `Participants` distribution.
 - `s_NN` — centre-of-mass energy per nucleon pair (GeV); used to derive the inelastic nucleon–nucleon cross section σ_NN.
 - `k` — shape parameter of the Gamma distribution used to sample per-participant fluctuation weights.
 - `p` — exponent for the thickness power-mean combination (`p = 0` selects the geometric mean).
-- `b` — (optional) two-element tuple `(b_min, b_max)` setting the range of the impact-parameter distribution. Defaults to `(0, 3(R1+R2)+6w)`.
+- `b` — (optional) two-element tuple `(b_min, b_max)` setting the range of the impact-parameter distribution. Defaults to
+  `(0, nuclear_extent(n1) + nuclear_extent(n2) + b_cut)`, where `nuclear_extent` is the radius beyond which the nuclear density
+  is negligible and `b_cut` the nucleon–nucleon distance beyond which the collision probability is below `1e-7`. This covers
+  every geometry that can produce a collision; the conditional distribution given at least one collision does not depend on `b_max`.
 
 # Keyword arguments
 - `Nr` — number of radial grid points used for the accumulation pre-computation (default: `32`; `64` when `b` is provided explicitly).
@@ -254,20 +259,57 @@ Constructor for the `Participants` distribution.
 """
 function Participants(n1, n2, w, s_NN, k, p, b::Tuple{T1, T2}; Nr = 64, Nth = 32, impact_parameter_angle = Uniform(0, 2pi)) where {T1 <: Real, T2 <: Real}
 
-    sigma_NN = cross_section_from_energy(s_NN)
-    f(sigmagg, p) = totalcross_section(w, sigmagg, sigma_NN)
-    u0 = one(sigma_NN)
-    prob = NonlinearProblem{false}(f, u0)
-    sol = solve(prob, SimpleNewtonRaphson())
-    sigg = sol.u
+    sigma_NN, sigg = solve_sigma_gg(w, s_NN)
+    b2_cutoff = pair_distance2_cutoff(w, sigg)
+
+    b[1] <= b[2] || throw(ArgumentError("impact-parameter range must satisfy b_min <= b_max, got $b"))
+    b_support = nuclear_extent(n1) + nuclear_extent(n2) + sqrt(b2_cutoff)
+    b[1] <= b_support || throw(ArgumentError("impact-parameter range $b has no collision support: nucleons never come within the collision range for b > $(round(b_support, digits = 2)) fm"))
 
     R1 = n1.R
     R2 = n2.R
     prep = prepare_accumulation(R1, R2, Nr, Nth)
 
-    return Participants(n1, n2, w, truncated(TriangularDist(0, b[2], b[2]), b[1], b[2]), impact_parameter_angle, sigg, k, sigma_NN, p, prep)
+    return Participants(n1, n2, w, truncated(TriangularDist(0, b[2], b[2]), b[1], b[2]), impact_parameter_angle, sigg, k, sigma_NN, b2_cutoff, p, prep)
 
 end
+
+"""
+    solve_sigma_gg(w, s_NN)
+
+Return `(σ_NN, σ_gg)`: the inelastic nucleon–nucleon cross section at `√s_NN` and the
+partonic cross section `σ_gg` that reproduces it for Gaussian nucleons of width `w`.
+"""
+function solve_sigma_gg(w, s_NN)
+    sigma_NN = cross_section_from_energy(s_NN)
+    f(sigmagg, p) = totalcross_section(w, sigmagg, sigma_NN)
+    u0 = one(sigma_NN)
+    prob = NonlinearProblem{false}(f, u0)
+    sol = solve(prob, SimpleNewtonRaphson())
+    return sigma_NN, sol.u
+end
+
+"""
+    pair_distance2_cutoff(w, sigma_gg; eps = 1e-7)
+
+Squared transverse distance beyond which the nucleon–nucleon collision probability
+`1 - exp(-σ_gg T_pp(b))` is smaller than `eps`. Pairs farther apart are skipped in the
+sampling loop; the expected number of collisions lost per event is below `eps · A₁A₂`.
+"""
+function pair_distance2_cutoff(w, sigma_gg; eps = 1.0e-7)
+    return max(4 * w^2 * log(sigma_gg / (4 * pi * w^2 * eps)), 0.0)
+end
+
+"""
+    nuclear_extent(nucleus)
+
+Radius beyond which the nucleon density of `nucleus` is negligible. Used to set the
+default upper limit of the impact-parameter distribution.
+"""
+nuclear_extent(n::NucleiWoodSaxon3D) = n.R * (1 + abs(n.beta2) + abs(n.beta3) + abs(n.beta4)) + 8 * n.α
+nuclear_extent(n::IntegratedWoodSaxon) = n.R + 8 * n.α
+nuclear_extent(n::IntegratedWoodSaxonInterp) = n.R + 8 * n.α
+nuclear_extent(n) = 3 * n.R   # conservative fallback for user-defined nuclei
 
 
 dimension(s::Participants{A, B, C, D, E, F, G, L, H}) where {A, B, C, D, E, F, G, L, H} = 1
@@ -275,10 +317,10 @@ dimension(s::Participants{A, B, C, D, E, F, G, L, H}) where {A, B, C, D, E, F, G
 
 function Participants(n1, n2, w, s_NN, k, p; Nr = 32, Nth = 32, impact_parameter_angle = Uniform(0, 2pi))
 
-    R1 = n1.R
-    R2 = n2.R
+    _, sigg = solve_sigma_gg(w, s_NN)
+    b_cut = sqrt(pair_distance2_cutoff(w, sigg))
 
-    b = (0, 3(R1 + R2) + 6 * w)
+    b = (0, nuclear_extent(n1) + nuclear_extent(n2) + b_cut)
     return Participants(n1, n2, w, s_NN, k, p, b; Nr = Nr, Nth = Nth, impact_parameter_angle = impact_parameter_angle)
 end
 
@@ -296,7 +338,7 @@ function Base.copy(s::Participants{A, B, C, D, E, F, G, H, L}) where {A, B, C, D
 
     return Participants(
         copy(s.nucl1), copy(s.nucl2), s.sub_nucleon_width,
-        truncated(TriangularDist(0, b[2], b[2]), b[1], b[2]), deepcopy(s.inpact_parameter_angle), s.sigma_gg, s.shape_parameter, s.total_cross_section, s.p, deepcopy(s.accumulation_preparation)
+        truncated(TriangularDist(0, b[2], b[2]), b[1], b[2]), deepcopy(s.inpact_parameter_angle), s.sigma_gg, s.shape_parameter, s.total_cross_section, s.b2_cutoff, s.p, deepcopy(s.accumulation_preparation)
     )
 
 end
@@ -326,6 +368,11 @@ end
 #3d case
 
 """
+Maximum number of consecutive attempts without a binary collision before `rand(::Participants)` raises an error.
+"""
+const MAX_COLLISION_ATTEMPTS = 100_000
+
+"""
     Distributions.rand(rng::AbstractRNG, nucleos::Participants)
 
 Sample a single collision `Participant` event from the configured `Participants` object.
@@ -335,13 +382,17 @@ Arguments
 - `nucleos` — a `Participants` instance describing the two nuclei, sub‑nucleon width, cross sections, and other sampling parameters.
 
 Behavior
-- Draws nucleus configurations `n1`, `n2` and an impact-parameter orientation `θ_b`.
-- Samples an impact-parameter magnitude `b` from `nucleos.inpact_parameter_magitude` and shifts the two nuclei by ±b/2.
-- For each nucleon pair computes the binary collision probability using `binary_impact_parameter_probability` and accepts collisions via Bernoulli draws.
+- Each attempt draws fresh nucleus configurations `n1`, `n2`, an impact-parameter orientation `θ_b` and a magnitude `b`
+  from `nucleos.inpact_parameter_magitude`, and shifts the two nuclei by ±b/2. Resampling the full geometry on every
+  attempt (rather than only `b`) is required for the event ensemble to weight configurations by their own collision
+  probability, and guarantees that a geometry with no reachable pair cannot stall the loop.
+- For each nucleon pair closer than `sqrt(nucleos.b2_cutoff)` computes the binary collision probability using `binary_impact_parameter_probability` and accepts collisions via uniform draws; farther pairs (probability below 1e-7) are skipped.
 - If at least one binary collision is discovered, builds a `Participant` containing participating nucleons, samples per-nucleon Gamma weights, recenters to the event center-of-mass (via `center_of_mass!`), and returns the populated `Participant`.
 
 Notes
 - The function uses rejection sampling to ensure the generated event contains at least one binary collision.
+- After `MAX_COLLISION_ATTEMPTS` consecutive attempts without a collision an error is raised; with the default
+  impact-parameter range this cannot happen by chance (the per-attempt success probability is of order 0.1–1).
 
 Example
 ```julia
@@ -356,14 +407,21 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
 
     R1 = nucleos.nucl1.R
     R2 = nucleos.nucl2.R
-    n1 = rand(rng, nucleos.nucl1)
-    n2 = rand(rng, nucleos.nucl2)
-    θ_b = rand(rng, nucleos.inpact_parameter_angle)
-    s_th, c_th = sincos(θ_b)
     re1 = Vector{SVector{2, eltype(nucleos.nucl1)}}()
     re2 = Vector{SVector{2, eltype(nucleos.nucl2)}}()
+    b2_cutoff = nucleos.b2_cutoff
+    attempts = 0
 
     while true
+        attempts += 1
+        if attempts > MAX_COLLISION_ATTEMPTS
+            bmin, bmax = extrema(nucleos.inpact_parameter_magitude)
+            error("no binary collision found in $MAX_COLLISION_ATTEMPTS attempts: the impact-parameter range ($bmin, $bmax) fm has (almost) no collision support for these nuclei and nucleon width $(nucleos.sub_nucleon_width) fm")
+        end
+        n1 = rand(rng, nucleos.nucl1)
+        n2 = rand(rng, nucleos.nucl2)
+        θ_b = rand(rng, nucleos.inpact_parameter_angle)
+        s_th, c_th = sincos(θ_b)
         b = rand(rng, nucleos.inpact_parameter_magitude)
         b_vec = SVector{2}(b * c_th / 2, b * s_th / 2)
         ncoll = 0
@@ -377,10 +435,11 @@ function Distributions.rand(rng::AbstractRNG, nucleos::Participants{NUCL1, NUCL2
 
                 v = pos1rotshift - pos2rotshift
                 impact_par = dot(v, v)
+                impact_par > b2_cutoff && continue
                 probability = binary_impact_parameter_probability(impact_par, nucleos)
 
                 #accepted
-                if rand(rng, Bernoulli(probability))
+                if rand(rng) < probability
                     push!(re1, pos1rotshift)
                     push!(re2, pos2rotshift)
                     ncoll += 1
