@@ -11,8 +11,8 @@ Fields
 - `w` — quadratic modulation coefficient.
 - `beta2, beta3, beta4` — deformation parameters (spherical-harmonic multipoles).
 - `gamma` — triaxiality angle used with `beta2`.
-- `burning_time` — number of burn-in transitions for the internal MCMC sampler.
-- `sampler` — internal `Metropolis_Hastings` sampler that proposes 3D locations according to the deformed density.
+- `burning_time` — unused, kept for backward compatibility.
+- `sampler` — internal `RejectionSampler` that draws exact 3D locations from the deformed density.
 - `d_min` — minimum inter-nucleon separation (when zero no separation enforcement is performed).
 
 Behavior
@@ -60,6 +60,12 @@ Returns
 function density_WS_deformed(x, y, z, α, R, ρ₀, w, beta2, beta3, beta4, gamma)
     #spherical coordinates
     r = hypot(x, y, z)
+
+    # spherical nucleus: Reff == R, skip the angular part (saves acos + 4 cos per evaluation)
+    if iszero(beta2) && iszero(beta3) && iszero(beta4)
+        return ρ₀ * (1 + w * (r / R)^2) / (1 + exp((r - R) / α))
+    end
+
     theta = acos(z / r)
     phi = sign(y) * acos(x / hypot(x, y))
 
@@ -76,6 +82,24 @@ function density_WS_deformed(x, y, z, α, R, ρ₀, w, beta2, beta3, beta4, gamm
     return ρ₀ * (1 + w * (r / Reff)^2) / (1 + exp((r - Reff) / α))
 end
 
+
+"""
+    density_WS_deformed_bound(L, α, R, ρ₀, w, beta2, beta3, beta4, gamma)
+
+Guaranteed upper bound of `density_WS_deformed` on the cube `[-L, L]³`.
+
+The Fermi factor is at most 1, and `Reff ≥ R_min = R (1 − |β₂|(|cosγ| max Y₂₀ + √2 |sinγ| max|Y₂₂|) − |β₃| max Y₃₀ − |β₄| max Y₄₀)`,
+so `ρ ≤ ρ₀ (1 + max(w, 0) · 3L² / R_min²)`. For `w = 0` (all built-in nuclei) this is simply `ρ₀`.
+"""
+function density_WS_deformed_bound(L, α, R, ρ₀, w, beta2, beta3, beta4, gamma)
+    maxY20 = sqrt(5 / (4 * pi))          # at θ = 0
+    maxY22 = sqrt(15 / (32 * pi))        # at θ = π/2, φ = 0
+    maxY30 = sqrt(7 / (4 * pi))          # at θ = 0
+    maxY40 = 3 / (2 * sqrt(pi))          # at θ = 0
+    Rmin = R * (1 - abs(beta2) * (abs(cos(gamma)) * maxY20 + sqrt(2) * abs(sin(gamma)) * maxY22) - abs(beta3) * maxY30 - abs(beta4) * maxY40)
+    Rmin > 0 || throw(ArgumentError("deformation too large: effective radius can reach zero (R_min = $Rmin)"))
+    return ρ₀ * (1 + max(w, zero(w)) * 3 * L^2 / Rmin^2)
+end
 
 dimension(::NucleiWoodSaxon3D{T, R, C, W, D1, D2, D3, D4, B, samp}) where {T, R, C, W, D1, D2, D3, D4, B, samp} = 2
 nucleon(s::NucleiWoodSaxon3D{T, R, C, W, D1, D2, D3, D4, B, samp}) where {T, R, C, W, D1, D2, D3, D4, B, samp} = s.N_nucleon
@@ -95,20 +119,21 @@ Arguments
 - `rng` — RNG used to seed proposals and acceptance tests in the internal MCMC sampler.
 - `N_nucleon` — number of nucleons to sample per draw.
 - `α, R, ρ₀, w, beta2, beta3, beta4, gamma` — Woods–Saxon and deformation parameters (see `density_WS_deformed`).
-- `burning_time` — number of burn-in iterations for the internal `Metropolis_Hastings` sampler.
+- `burning_time` — ignored; kept for backward compatibility (the sampler is exact and needs no burn-in).
 - `dmin` — minimum inter-nucleon separation (stored on the object; not applied here by the constructor).
 
 Behavior
-- Constructs a 3-component Normal proposal (σ=R) and a `Metropolis_Hastings` sampler targeting `density_WS_deformed`, performs the requested burn-in, and returns a fully configured `NucleiWoodSaxon3D` instance ready for sampling via `rand`.
+- Constructs a `RejectionSampler` targeting `density_WS_deformed` on a box that contains the nucleus, and returns a fully configured `NucleiWoodSaxon3D` instance ready for sampling via `rand`.
 """
 function NucleiWoodSaxon3D(rng::AbstractRNG, N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma, burning_time, dmin)
 
-    #draw=(Uniform(-2R,2R),Uniform(-2R,2R),Uniform(-2R,2R))
-    draw = (Normal(0, R), Normal(0, R), Normal(0, R))
+    # box large enough to contain the deformed surface plus a 10α tail (ρ/ρ₀ ≈ e^-10 at the edge)
+    L = float(R * (1 + abs(beta2) + abs(beta3) + abs(beta4)) + 10 * α)
 
     params = (α, R, ρ₀, w, beta2, beta3, beta4, gamma)
 
-    sampler = Metropolis_Hastings(rng, density_WS_deformed, params, draw, burning_time)
+    bound = density_WS_deformed_bound(L, α, R, ρ₀, w, beta2, beta3, beta4, gamma)
+    sampler = RejectionSampler(density_WS_deformed, params, (L, L, L), bound)
 
     return NucleiWoodSaxon3D(N_nucleon, α, R, ρ₀, w, beta2, beta3, beta4, gamma, burning_time, sampler, dmin)
 
@@ -149,7 +174,7 @@ Arguments
 - `x` — preallocated matrix to be filled; expected shape `(s.N_nucleon, 2)` representing transverse `(x,y)` coordinates.
 
 Behavior
-- For each nucleon the function draws a 3‑vector from the internal `Metropolis_Hastings` sampler via `rand(rng, s.sampler)`.
+- For each nucleon the function draws an independent 3‑vector from the internal `RejectionSampler` via `rand(rng, s.sampler)`.
 - A single random `RotMatrix{3}` is sampled and applied to all nucleon positions; the rotated 3‑vector is projected to `(x,y)` and written into `x`.
 - If `s.d_min > 0` a minimum-inter-nucleon-separation policy may be applied (implementation detail); when zero no separation policy is enforced.
 

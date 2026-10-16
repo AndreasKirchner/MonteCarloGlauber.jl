@@ -20,5 +20,9 @@ Use one of the built-in nucleus helpers:
 - `Lead()`, `Gold()`, `Uranium()`, `Copper()`, `Xenon()` for Woods-Saxon nuclei.
 - `Oxygen()` and `Neon()` for tabulated light-ion configurations.
 
+Woods-Saxon nucleons are drawn by exact rejection sampling of the (deformed) density, so each nucleon is an independent draw and no burn-in is required. The sampled radial density reproduces the analytic profile within statistics:
+
+![Sampled vs analytic Woods-Saxon radial density for lead](assets/radial_density_check.png)
+
 ## Event Profiles
 `Participant` objects are callable: `evt(x, y)` returns the fluctuating thickness at coordinates `(x, y)`. This enables direct integration for eccentricities or sampling on grids for visualization.

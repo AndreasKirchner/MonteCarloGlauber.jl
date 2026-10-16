@@ -1,6 +1,8 @@
 using MonteCarloGlauber
 using Random
 using StaticArrays
+using Statistics
+using QuadGK
 using Test
 
 @testset "MonteCarloGlauber.jl" begin
@@ -14,6 +16,63 @@ using Test
         sample = rand(rng, aa)
         @test size(sample) == (4, 2)
         @test eltype(sample) == Float64
+    end
+
+    @testset "Woods-Saxon radial density is sampled exactly" begin
+        # Lead: R = 6.65, α = 0.54. Compare the sampled radial histogram with the analytic
+        # Woods-Saxon profile shell by shell, and the mean radius. The previous Metropolis
+        # sampler failed this test by ~10σ in the inner shells.
+        R, α = 6.65, 0.54
+        ρ(r) = 1 / (1 + exp((r - R) / α))
+        Z = quadgk(r -> r^2 * ρ(r), 0, 30)[1]
+        n = Lead()
+        rng = MersenneTwister(42)
+        N = 100_000
+        rs = [hypot(rand(rng, n.sampler)...) for _ in 1:N]
+        for lo in 0.0:1.0:9.0
+            expected = N * quadgk(r -> r^2 * ρ(r), lo, lo + 1)[1] / Z
+            observed = count(r -> lo <= r < lo + 1, rs)
+            @test abs(observed - expected) < 4 * sqrt(expected)
+        end
+        mean_r_exact = quadgk(r -> r^3 * ρ(r), 0, 30)[1] / Z
+        @test abs(mean(rs) - mean_r_exact) < 0.02
+        # projected (2D) samplers: ⟨x²+y²⟩ = (2/3)⟨r²⟩
+        r2_exact = quadgk(r -> r^4 * ρ(r), 0, 30)[1] / Z
+        itp = IntegratedWoodSaxonInterp(208, α, R, 1.0, 0.0, 10, 1.0e-3, 100, rng, true)
+        r2_2d = mean(sum(abs2, rand(rng, itp.sampler)) for _ in 1:N)
+        @test abs(r2_2d / (2 / 3 * r2_exact) - 1) < 0.02
+    end
+
+    @testset "Rejection sampler envelope is a guaranteed bound" begin
+        # Regression: a very diffuse profile (α = R) whose peak a coarse grid scan missed.
+        n = NucleiWoodSaxon3D(10, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        @test n.sampler.bound >= 1 / (1 + exp(-1.0))              # true maximum of ρ
+        ρ(r) = 1 / (1 + exp(r - 1))
+        Z = quadgk(r -> r^2 * ρ(r), 0, 40)[1]
+        trng = MersenneTwister(5)
+        rs = [hypot(rand(trng, n.sampler)...) for _ in 1:200_000]
+        @test abs(mean(rs) - quadgk(r -> r^3 * ρ(r), 0, 40)[1] / Z) < 0.012
+        p_core = quadgk(r -> r^2 * ρ(r), 0, 0.5)[1] / Z
+        @test abs(mean(rs .< 0.5) - p_core) < 3.5 * sqrt(p_core / length(rs))
+
+        # bound ≥ target at random points in the box, for deformed, modulated and projected targets
+        for nuc in (
+                Uranium(),
+                NucleiWoodSaxon3D(10, 0.5, 5.0, 2.0, 0.3, 0.2, 0.1, 0.1, 0.4),     # w > 0, triaxial
+                IntegratedWoodSaxon(10, 0.6, 5.0, 1.0, 0.2, true, 1.0e-4, trng, 10),
+                IntegratedWoodSaxonInterp(10, 0.6, 5.0, 1.0, 0.2, 10, 1.0e-4, 60, trng, true),
+            )
+            s = nuc.sampler
+            for _ in 1:500
+                x = ntuple(i -> (2 * rand(trng) - 1) * s.half_width[i], length(s.half_width))
+                @test s.target_probability(x..., s.params...) <= s.bound
+            end
+        end
+
+        # an envelope violation is reported, not silently clipped
+        bad = MonteCarloGlauber.RejectionSampler((x) -> 2.0, (), (1.0,), 1.0)
+        @test_throws ErrorException rand(trng, bad)
+        @test_throws ArgumentError MonteCarloGlauber.RejectionSampler((x) -> 1.0, (), (1.0,), 0.0)
     end
 
     @testset "IntegratedWoodSaxon basics" begin

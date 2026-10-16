@@ -21,7 +21,7 @@ using Statistics
 using Artifacts
 
 
-include("Metropolis_Hastings.jl")
+include("Rejection_sampler.jl")
 include("Integrated_wood_saxson_refactor.jl")
 include("Integrated_wood_saxson_interp_refactor.jl")
 include("Nucleus3D_refactor.jl")
